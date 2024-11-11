@@ -9,6 +9,7 @@
   "dependencies": {
     "@azure/functions": "^4.0.0",
     "@azure/identity": "^4.5.0",
+    "csv-writer": "^1.6.0",
     "pg": "^8.13.1"
   },
   "main": "src/{index.js,functions/*.js}"
