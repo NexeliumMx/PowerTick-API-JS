@@ -21,6 +21,7 @@ app.http('testDBconnection', {
                     database: process.env.PGDATABASE,
                     port: process.env.PGPORT || 5432,
                     ssl: { rejectUnauthorized: false },  // Enable SSL for secure connection
+                    user: "52d51591-edd1-4335-af64-3eba095ab8da",  // Object ID of the managed identity
                     password: tokenResponse.token  // Use the token as the password
                 });
 
