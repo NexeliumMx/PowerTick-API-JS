@@ -21,7 +21,6 @@ app.http('testDBconnection', {
                     database: process.env.PGDATABASE,
                     port: process.env.PGPORT || 5432,
                     ssl: { rejectUnauthorized: false },  // Enable SSL for secure connection
-                    user: process.env.PGUSER || "managed_identity_user",  // Optional; managed identity username
                     password: tokenResponse.token  // Use the token as the password
                 });
 
@@ -40,7 +39,7 @@ app.http('testDBconnection', {
         // Call the function to test the connection
         const result = await connectToDatabase();
 
-        // Return the result as a JSON string
+        // Return the result as the HTTP response
         return {
             status: 200,
             headers: { 'Content-Type': 'application/json' },
