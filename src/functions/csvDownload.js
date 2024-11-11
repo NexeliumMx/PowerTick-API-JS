@@ -2,7 +2,7 @@ const { app } = require('@azure/functions');
 const { ReadData } = require('./sql_connect.js');
 const { createObjectCsvStringifier } = require('csv-writer');
 
-app.http('httpTrigger1', {
+app.http('csvDownload', {
     methods: ['GET', 'POST'],
     authLevel: 'anonymous',
     handler: async (req, context) => {
