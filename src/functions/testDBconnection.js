@@ -12,6 +12,8 @@ app.http('testDBconnection', {
 
             // Example query to test connection (modify as needed)
             const res = await client.query("SELECT 'Connection test successful' AS message");
+            client.release(); // Release client back to the pool
+
             context.log("Database query executed successfully:", res.rows[0].message);
 
             // Return success message as HTTP response

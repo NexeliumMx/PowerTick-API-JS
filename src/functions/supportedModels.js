@@ -13,6 +13,7 @@ app.http('supportedModels', {
             // Query to retrieve all rows from public.supported_models
             const query = 'SELECT serial, manufacturer, series, model FROM public.supported_models;';
             const result = await client.query(query);
+            client.release(); // Release client back to the pool
 
             // Format the result into JSON format
             const supportedModels = result.rows.map(row => ({

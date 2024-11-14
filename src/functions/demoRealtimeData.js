@@ -17,10 +17,9 @@ app.http('demoRealtimeData', {
             };
         }
 
-        // Connect to the database
+        // Get a pooled client from the connection pool
         const client = await getClient();
 
-        // Define the SQL query
         const query = `
             SELECT
                 "timestamp",
@@ -95,7 +94,6 @@ app.http('demoRealtimeData', {
 
         try {
             const res = await client.query(query, [serialNumber]);
-            await client.end();
 
             if (res.rows.length === 0) {
                 return {
@@ -118,6 +116,8 @@ app.http('demoRealtimeData', {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ message: 'Error fetching real-time data.' })
             };
+        } finally {
+            client.release(); // Release the client back to the pool
         }
     }
 });
