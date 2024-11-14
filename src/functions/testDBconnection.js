@@ -2,7 +2,7 @@ const { app } = require('@azure/functions');
 const { getClient } = require('./dbClient');
 
 app.http('testDBconnection', {
-    methods: ['GET', 'POST'],
+    methods: ['GET'],
     authLevel: 'anonymous',
     handler: async (request, context) => {
         context.log(`Http function processed request for url "${request.url}"`);
