@@ -11,19 +11,33 @@ app.http('testDBconnection', {
         // Function to connect to the PostgreSQL database
         async function connectToDatabase() {
             try {
-                // Initialize DefaultAzureCredential for managed identity authentication
-                const credential = new DefaultAzureCredential();
-                const tokenResponse = await credential.getToken("https://ossrdbms-aad.database.windows.net");
+                let client;
 
-                // Create a new PostgreSQL client using the access token as the password
-                const client = new Client({
-                    host: process.env.PGHOST,
-                    database: process.env.PGDATABASE,
-                    port: process.env.PGPORT || 5432,
-                    ssl: { rejectUnauthorized: false },  // Enable SSL for secure connection
-                    user: "PowerTick-API-JS",  // Use the PostgreSQL role name
-                    password: tokenResponse.token  // Use the token as the password
-                });
+                // Check if running locally by checking the absence of `WEBSITE_INSTANCE_ID`
+                if (!process.env.WEBSITE_INSTANCE_ID) {
+                    // Running locally - use traditional user/password authentication
+                    client = new Client({
+                        host: process.env.PGHOST,
+                        database: process.env.PGDATABASE,
+                        port: process.env.PGPORT || 5432,
+                        ssl: { rejectUnauthorized: false },  // Enable SSL for secure connection
+                        user: process.env.PGUSER,  // Use the environment variable PGUSER
+                        password: process.env.PGPASSWORD  // Use the environment variable PGPASSWORD
+                    });
+                } else {
+                    // Running in Azure - use token-based authentication with managed identity
+                    const credential = new DefaultAzureCredential();
+                    const tokenResponse = await credential.getToken("https://ossrdbms-aad.database.windows.net");
+
+                    client = new Client({
+                        host: process.env.PGHOST,
+                        database: process.env.PGDATABASE,
+                        port: process.env.PGPORT || 5432,
+                        ssl: { rejectUnauthorized: false },  // Enable SSL for secure connection
+                        user: "PowerTick-API-JS",  // Use the PostgreSQL role name for Azure
+                        password: tokenResponse.token  // Use the token as the password
+                    });
+                }
 
                 // Connect to the database
                 await client.connect();
