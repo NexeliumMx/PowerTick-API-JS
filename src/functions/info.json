@@ -1,0 +1,17 @@
+[
+  {
+  "client_id": "TSF123456789",
+  "serial_number": "DEMO0000009",
+  "manufacturer": "not_set",
+  "series": "not_set",
+  "model": "not_set",
+  "firmware_v": "not_set",
+  "branch": "not_set",
+  "location": "not_set",
+  "coordinates": "not_set",
+  "load_center": "not_set",
+  "register_date": "2024-11-14 21:13:56.187429+00",
+  "facturation_interval_months": 0,
+  "facturation_day": 0,
+  "time_zone": "America/Mexico_City"
+}]

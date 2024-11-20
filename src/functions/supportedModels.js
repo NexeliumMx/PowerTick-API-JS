@@ -1,3 +1,15 @@
+/**
+ * Author: Arturo Vargas Cuevas
+ * Last Modified Date: 2024-11-20
+ *
+ * This function serves as an HTTP GET endpoint to retrieve the list of supported powermeter models.
+ * It provides information about the manufacturer, series, and model of each supported device.
+ *
+ * Example:
+ * Query supported models:
+ * curl -X GET "http://localhost:7071/api/supportedModels"
+ */
+
 const { app } = require('@azure/functions');
 const { getClient } = require('./dbClient');
 

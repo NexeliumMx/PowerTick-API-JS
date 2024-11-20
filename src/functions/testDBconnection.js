@@ -1,3 +1,18 @@
+/**
+ * Author: Arturo Vargas Cuevas
+ * Last Modified Date: 2024-11-20
+ *
+ * This function serves as an HTTP GET endpoint to test the database connection.
+ * It verifies that the API can successfully connect to the database and returns the result.
+ *
+ * Example:
+ * Test database connection:
+ * curl -X GET "http://localhost:7071/api/testDBconnection"
+ *
+ * Expected Response:
+ * {"success":true,"message":"Connection test successful"}
+ */
+
 const { app } = require('@azure/functions');
 const { getClient } = require('./dbClient');
 
