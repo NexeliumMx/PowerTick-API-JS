@@ -1,3 +1,27 @@
+/**
+ * Author: Arturo Vargas Cuevas
+ * Last Modified Date: 2024-11-21
+ *
+ * This module provides a database connection pool using the `pg` library for PostgreSQL.
+ * It supports two environments:
+ * - **Local Development**: Utilizes traditional username/password authentication.
+ * - **Azure Environment**: Implements token-based authentication with Azure Managed Identity.
+ *
+ * Key Features:
+ * - Initializes a connection pool (`initPool`) to manage database connections efficiently.
+ * - Reuses the pool if it has already been created, optimizing resource usage.
+ * - Uses `DefaultAzureCredential` to retrieve authentication tokens for Azure.
+ * - Provides a function (`getClient`) to fetch a database client from the pool for executing queries.
+ *
+ * Conditions for the Code to Work:
+ * - Environment variables (`PGHOST`, `PGDATABASE`, `PGPORT`, `PGUSER`, `PGPASSWORD`) must be correctly set.
+ * - For Azure, Managed Identity must be configured and the application must have access to the PostgreSQL server.
+ * - A valid token must be retrievable from Azure Managed Identity.
+ *
+ * How to import to other codes:
+ * const { getClient } = require('./dbClient');
+ */
+
 const { Pool } = require('pg');
 const { DefaultAzureCredential } = require('@azure/identity');
 
