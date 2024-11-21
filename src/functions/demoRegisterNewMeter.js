@@ -13,7 +13,7 @@
  *
  * Example:
  * Register a new meter:
- * curl -X POST "http://localhost:7071/api/registerNewMeter." \
+ * curl -X POST "http://localhost:7071/api/demoRegisterNewMeter." \
  * -H "Content-Type: application/json" \
  * -d '{ 
  *     "serial_number": "DEMO0000010",
@@ -26,7 +26,7 @@
 const { app } = require('@azure/functions');
 const { getClient } = require('./dbClient');
 
-app.http('registerNewMeter', {
+app.http('demoRegisterNewMeter', {
     methods: ['POST'],
     authLevel: 'anonymous',
     handler: async (request, context) => {
@@ -65,7 +65,7 @@ app.http('registerNewMeter', {
 
             // SQL query for insertion
             const query = `
-                INSERT INTO dev.powermeters (${columns}, register_date)
+                INSERT INTO demo.powermeters (${columns}, register_date)
                 VALUES (${values}, NOW())
             `;
             context.log("Constructed query:", query);
