@@ -2,7 +2,7 @@
 # PowerTick Node.js API Documentation
 
 ## Overview
-The PowerTIC API is built with Azure Functions and provides endpoints to monitor and manage powermeter data for multiple locations and clients. This documentation outlines all available endpoints, their purposes, and how to interact with them.
+The PowerTick Node.js API is built with Azure Functions and provides endpoints to monitor and manage powermeter data for multiple locations and clients. This documentation outlines all available endpoints, their purposes, and how to interact with them.
 
 ---
 ## API Endpoints
@@ -224,7 +224,3 @@ Below are examples of how to interact with each API endpoint using `curl`.
   ```bash
   curl -X POST "https://powertick-api-js.azurewebsites.net/api/httpTrigger1"   -H "Content-Type: application/json"   -d '{ "sampleData": "test" }'
   ```
-
----
-
-Feel free to modify the example serial numbers, timestamps, and other parameters as needed for testing purposes.
