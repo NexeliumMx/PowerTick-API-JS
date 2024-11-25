@@ -18,6 +18,7 @@ The PowerTick Node.js API is built with Azure Functions and provides endpoints t
 | `/api/demoRealtimeData`          | GET        | Retrieve the latest real-time data for a powermeter.    |
 | `/api/demoRegisterNewMeter`      | POST       | Register a new powermeter into the database.            |
 | `/api/demoMaxDemand`             | GET        | Retrieve max demand for a specific powermeter. 
+| `/api/demoPowermeterInfo`        | GET        | Retrieve specific information for a powermeter.         |
 
 ### Public API Endpoints
 
@@ -32,6 +33,7 @@ The PowerTick Node.js API is built with Azure Functions and provides endpoints t
 | `/api/getPowerMetersInfo` | GET        | Retrieve all powermeters in the database.               |
 | `/api/postReading`        | POST       | Submit a new reading for a powermeter.                  |
 | `/api/registerNewMeter`   | POST       | Register a new powermeter into the database.            |
+| `/api/powerMeterInfo`     | GET        | Retrieve specific information for a powermeter.         |
 
 ### Test API Endpoints
 
@@ -64,6 +66,40 @@ The PowerTick Node.js API is built with Azure Functions and provides endpoints t
 ## Usage Examples
 
 Below are examples of how to interact with each API endpoint using `curl`.
+### `/api/demoPowermeterInfo` - GET
+
+**Description**: Retrieve specific information for a powermeter.
+
+**Examples**:
+
+- **Local Test**:
+  ```bash
+  curl -X GET "http://localhost:7071/api/demoPowermeterInfo?sn=DEMO0000003"
+  ```
+
+- **Cloud Test**:
+  ```bash
+  curl -X GET "https://powertick-api-js.azurewebsites.net/api/demoPowermeterInfo?sn=DEMO0000003"
+  ```
+
+---
+
+### `/api/powerMeterInfo` - GET
+
+**Description**: Retrieve specific information for a powermeter in the dev environment.
+
+**Examples**:
+
+- **Local Test**:
+  ```bash
+  curl -X GET "http://localhost:7071/api/powerMeterInfo?sn=DEMO0000003"
+  ```
+
+- **Cloud Test**:
+  ```bash
+  curl -X GET "https://powertick-api-js.azurewebsites.net/api/powerMeterInfo?sn=DEMO0000003"
+  ```
+  
 ### `/api/demoMaxDemand` - GET
 
 **Description**: Retrieve max demand for a specific powermeter.
