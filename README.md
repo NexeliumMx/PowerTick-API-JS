@@ -17,6 +17,7 @@ The PowerTick Node.js API is built with Azure Functions and provides endpoints t
 | `/api/demoPowerFactorHistory`    | GET        | Retrieve power factor history for a powermeter.         |
 | `/api/demoRealtimeData`          | GET        | Retrieve the latest real-time data for a powermeter.    |
 | `/api/demoRegisterNewMeter`      | POST       | Register a new powermeter into the database.            |
+| `/api/demoMaxDemand`             | GET        | Retrieve max demand for a specific powermeter. 
 
 ### Public API Endpoints
 
@@ -63,6 +64,43 @@ The PowerTick Node.js API is built with Azure Functions and provides endpoints t
 ## Usage Examples
 
 Below are examples of how to interact with each API endpoint using `curl`.
+### `/api/demoMaxDemand` - GET
+
+**Description**: Retrieve max demand for a specific powermeter.
+
+**Examples**:
+
+- **Query for the past day**:
+  ```bash
+  curl -X GET "http://localhost:7071/api/demoMaxDemand?sn=DEMO0000003&time=day"
+  ```
+
+- **Query for the past month**:
+  ```bash
+  curl -X GET "http://localhost:7071/api/demoMaxDemand?sn=DEMO0000003&time=month"
+  ```
+
+- **Query for the past year**:
+  ```bash
+  curl -X GET "http://localhost:7071/api/demoMaxDemand?sn=DEMO0000003&time=year"
+  ```
+
+**Cloud Test Examples**:
+- **Query for the past day**:
+  ```bash
+  curl -X GET "https://powertick-api-js.azurewebsites.net/api/demoMaxDemand?sn=DEMO0000003&time=day"
+  ```
+
+- **Query for the past month**:
+  ```bash
+  curl -X GET "https://powertick-api-js.azurewebsites.net/api/demoMaxDemand?sn=DEMO0000003&time=month"
+  ```
+
+- **Query for the past year**:
+  ```bash
+  curl -X GET "https://powertick-api-js.azurewebsites.net/api/demoMaxDemand?sn=DEMO0000003&time=year"
+  ```
+
 
 ### `/api/demoConsumptionHistory` - GET
 
