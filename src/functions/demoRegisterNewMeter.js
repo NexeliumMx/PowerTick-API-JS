@@ -1,6 +1,6 @@
 /**
  * Author: Arturo Vargas Cuevas
- * Last Modified Date: 2024-11-20
+ * Last Modified Date: 02-12-2024
  *
  * This function serves as an HTTP POST endpoint to register a new powermeter in the database.
  * It expects a JSON object with meter details, validates that all required fields are present,
@@ -13,10 +13,10 @@
  *
  * Example:
  * Register a new meter:
- * curl -X POST "http://localhost:7071/api/demoRegisterNewMeter." \
+ * curl -X POST "http://localhost:7071/api/demoRegisterNewMeter" \
  * -H "Content-Type: application/json" \
  * -d '{ 
- *     "serial_number": "DEMO0000010",
+ *     "serial_number": "DEMO0000011",
  *     "manufacturer": "AccurEnergy",
  *     "series": "Accurev1330",
  *     "model": "Accurev1335",
@@ -30,14 +30,14 @@ app.http('demoRegisterNewMeter', {
     methods: ['POST'],
     authLevel: 'anonymous',
     handler: async (request, context) => {
-        context.log(`Http function processed request for url "${request.url}"`);
+        context.log(`Http function processed request for URL "${request.url}"`);
 
         const client = await getClient(); // Await the database client initialization
 
         try {
             // Parse the JSON payload
             const meter = await request.json();
-            context.log("Received request payload:", meter);
+            context.log("Received request payload:", JSON.stringify(meter));
 
             // Validate that the meter object contains required fields
             const requiredFields = ['serial_number', 'manufacturer', 'series', 'model', 'firmware_v'];
@@ -70,13 +70,24 @@ app.http('demoRegisterNewMeter', {
             `;
             context.log("Constructed query:", query);
 
-            // Execute the query
-            await client.query(query, Object.values(meterWithDefaults));
-            context.log(`Inserted meter with serial_number: ${meter.serial_number}`);
+            // Retry mechanism for transient errors
+            const maxRetries = 3;
+            for (let attempt = 1; attempt <= maxRetries; attempt++) {
+                try {
+                    await client.query(query, Object.values(meterWithDefaults));
+                    context.log(`Inserted meter with serial_number: ${meter.serial_number}`);
+                    break; // Exit loop on success
+                } catch (error) {
+                    context.log.warn(`Error inserting meter (Attempt ${attempt}):`, error.message);
+                    if (attempt === maxRetries) {
+                        throw error; // Rethrow error after all retries
+                    }
+                }
+            }
 
             return { status: 200, body: 'Meter successfully registered.' };
         } catch (error) {
-            context.log.error('Error inserting meter:', error);
+            context.log.error('Error inserting meter:', error.stack);
             return { status: 500, body: `Error: ${error.message}` };
         } finally {
             // Release the database client

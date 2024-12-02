@@ -1,3 +1,23 @@
+/**
+ * Author: Arturo Vargas Cuevas
+ * Last Modified Date: 02-12-2024
+ *
+ * Objective:
+ * This function serves as an HTTP GET endpoint to fetch detailed information about a specific powermeter 
+ * from the `demo.powermeters` table based on the provided serial number (SN). It validates the input 
+ * and returns the powermeter information in JSON format.
+ *
+ * Key Features:
+ * - Accepts a serial number as a query parameter (`?sn=DEMO0000001`).
+ * - Validates the presence of the `sn` parameter.
+ * - Queries the `demo.powermeters` table for matching records.
+ * - Returns the powermeter details as JSON if found.
+ * - Handles errors such as missing parameters, no matching records, or query execution issues.
+ *
+ * Example:
+ * Fetch powermeter information for a specific serial number:
+ * curl -X GET "http://localhost:7071/api/demoPowerMeterInfo?sn=DEMO0000001"
+ */
 const { app } = require('@azure/functions');
 const { getClient } = require('./dbClient');
 
