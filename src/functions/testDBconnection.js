@@ -1,6 +1,6 @@
 /**
  * Author: Arturo Vargas Cuevas
- * Last Modified Date: 2024-11-20
+ * Last Modified Date: 20-11-2024
  *
  * This function serves as an HTTP GET endpoint to test the database connection.
  * It verifies that the API can successfully connect to the database and returns the result.

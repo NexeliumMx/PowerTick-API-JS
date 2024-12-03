@@ -1,6 +1,6 @@
 /**
  * Author: Arturo Vargas Cuevas
- * Last Modified Date: 2024-11-21
+ * Last Modified Date: 21-11-2024
  *
  * This function serves as an HTTP GET endpoint to retrieve all powermeter data 
  * from the `dev.powermeters` table in the database. The data is returned as a JSON array.

@@ -1,6 +1,6 @@
 /**
  * Author: Arturo Vargas Cuevas
- * Last Modified Date: 2024-11-20
+ * Last Modified Date: 20-11-2024
  *
  * This function serves as an HTTP GET endpoint to retrieve the list of supported powermeter models.
  * It provides information about the manufacturer, series, and model of each supported device.

@@ -5,42 +5,44 @@
 The PowerTick Node.js API is built with Azure Functions and provides endpoints to monitor and manage powermeter data for multiple locations and clients. This documentation outlines all available endpoints, their purposes, and how to interact with them.
 
 ---
+
 ## API Endpoints
+
 ### Demo API Endpoints
 
-| **Endpoint**                     | **Method** | **Description**                                         |
-|----------------------------------|------------|---------------------------------------------------------|
-| `/api/demoConsumptionHistory`    | GET        | Fetch consumption history for a specific powermeter.    |
-| `/api/demoGetPowerMetersInfo`    | GET        | Retrieve all powermeters in the database.               |
-| `/api/demoPostReading`           | POST       | Submit a new reading for a powermeter.                  |
-| `/api/demoPowerDemandHistory`    | GET        | Retrieve power demand history for a powermeter.         |
-| `/api/demoPowerFactorHistory`    | GET        | Retrieve power factor history for a powermeter.         |
-| `/api/demoRealtimeData`          | GET        | Retrieve the latest real-time data for a powermeter.    |
-| `/api/demoRegisterNewMeter`      | POST       | Register a new powermeter into the database.            |
-| `/api/demoMaxDemand`             | GET        | Retrieve max demand for a specific powermeter. 
-| `/api/demoPowermeterInfo`        | GET        | Retrieve specific information for a powermeter.         |
+| **Endpoint**                                         | **Method** | **Description**                                         |
+|------------------------------------------------------|------------|---------------------------------------------------------|
+| [`/api/demoConsumptionHistory`](#api/demoConsumptionHistory)    | GET        | Fetch consumption history for a specific powermeter.    |
+| [`/api/demoGetPowerMetersInfo`](#api/demoGetPowerMetersInfo---get)    | GET        | Retrieve all powermeters in the database.               |
+| [`/api/demoPostReading`](#api/demoPostReading---post)               | POST       | Submit a new reading for a powermeter.                  |
+| [`/api/demoPowerDemandHistory`](#api/demoPowerDemandHistory---get)    | GET        | Retrieve power demand history for a powermeter.         |
+| [`/api/demoPowerFactorHistory`](#api/demoPowerFactorHistory---get)    | GET        | Retrieve power factor history for a powermeter.         |
+| [`/api/demoRealtimeData`](#api/demoRealtimeData---get)              | GET        | Retrieve the latest real-time data for a powermeter.    |
+| [`/api/demoRegisterNewMeter`](#api/demoRegisterNewMeter---post)      | POST       | Register a new powermeter into the database.            |
+| [`/api/demoMaxDemand`](#api/demoMaxDemand---get)                     | GET        | Retrieve max demand for a specific powermeter.          |
+| [`/api/demoPowermeterInfo`](#api/demoPowermeterInfo---get)           | GET        | Retrieve specific information for a powermeter.         |
 
 ### Public API Endpoints
 
-| **Endpoint**           | **Method** | **Description**                                 |
-|------------------------|------------|-------------------------------------------------|
-| `/api/supportedModels` | GET        | Retrieve a list of supported powermeter models. |
+| **Endpoint**                                         | **Method** | **Description**                                 |
+|------------------------------------------------------|------------|-------------------------------------------------|
+| [`/api/supportedModels`](#api/supportedModels---get) | GET        | Retrieve a list of supported powermeter models. |
 
 ### Dev API Endpoints
 
-| **Endpoint**              | **Method** | **Description**                                         |
-|---------------------------|------------|---------------------------------------------------------|
-| `/api/getPowerMetersInfo` | GET        | Retrieve all powermeters in the database.               |
-| `/api/postReading`        | POST       | Submit a new reading for a powermeter.                  |
-| `/api/registerNewMeter`   | POST       | Register a new powermeter into the database.            |
-| `/api/powerMeterInfo`     | GET        | Retrieve specific information for a powermeter.         |
+| **Endpoint**                                         | **Method** | **Description**                                         |
+|------------------------------------------------------|------------|---------------------------------------------------------|
+| [`/api/getPowerMetersInfo`](#api/getPowerMetersInfo---get)         | GET        | Retrieve all powermeters in the database.               |
+| [`/api/postReading`](#api/postReading---post)                     | POST       | Submit a new reading for a powermeter.                  |
+| [`/api/registerNewMeter`](#api/registerNewMeter---post)           | POST       | Register a new powermeter into the database.            |
+| [`/api/powerMeterInfo`](#api/powerMeterInfo---get)                 | GET        | Retrieve specific information for a powermeter.         |
 
 ### Test API Endpoints
 
-| **Endpoint**            | **Method** | **Description**                                         |
-|-------------------------|------------|---------------------------------------------------------|
-| `/api/httpTrigger1`     | GET, POST  | Sample trigger for testing.                             |
-| `/api/testDBconnection` | GET        | Test the database connection.                           |
+| **Endpoint**                                         | **Method** | **Description**                                         |
+|------------------------------------------------------|------------|---------------------------------------------------------|
+| [`/api/httpTrigger1`](#api/httpTrigger1---get-post)  | GET, POST  | Sample trigger for testing.                             |
+| [`/api/testDBconnection`](#api/testDBconnection---get)             | GET        | Test the database connection.                           |
 
 ---
 
@@ -64,79 +66,6 @@ The PowerTick Node.js API is built with Azure Functions and provides endpoints t
 ---
 
 ## Usage Examples
-
-Below are examples of how to interact with each API endpoint using `curl`.
-### `/api/demoPowermeterInfo` - GET
-
-**Description**: Retrieve specific information for a powermeter.
-
-**Examples**:
-
-- **Local Test**:
-  ```bash
-  curl -X GET "http://localhost:7071/api/demoPowermeterInfo?sn=DEMO0000003"
-  ```
-
-- **Cloud Test**:
-  ```bash
-  curl -X GET "https://powertick-api-js.azurewebsites.net/api/demoPowermeterInfo?sn=DEMO0000003"
-  ```
-
----
-
-### `/api/powerMeterInfo` - GET
-
-**Description**: Retrieve specific information for a powermeter in the dev environment.
-
-**Examples**:
-
-- **Local Test**:
-  ```bash
-  curl -X GET "http://localhost:7071/api/powerMeterInfo?sn=DEMO0000003"
-  ```
-
-- **Cloud Test**:
-  ```bash
-  curl -X GET "https://powertick-api-js.azurewebsites.net/api/powerMeterInfo?sn=DEMO0000003"
-  ```
-  
-### `/api/demoMaxDemand` - GET
-
-**Description**: Retrieve max demand for a specific powermeter.
-
-**Examples**:
-
-- **Query for the past day**:
-  ```bash
-  curl -X GET "http://localhost:7071/api/demoMaxDemand?sn=DEMO0000003&time=day"
-  ```
-
-- **Query for the past month**:
-  ```bash
-  curl -X GET "http://localhost:7071/api/demoMaxDemand?sn=DEMO0000003&time=month"
-  ```
-
-- **Query for the past year**:
-  ```bash
-  curl -X GET "http://localhost:7071/api/demoMaxDemand?sn=DEMO0000003&time=year"
-  ```
-
-**Cloud Test Examples**:
-- **Query for the past day**:
-  ```bash
-  curl -X GET "https://powertick-api-js.azurewebsites.net/api/demoMaxDemand?sn=DEMO0000003&time=day"
-  ```
-
-- **Query for the past month**:
-  ```bash
-  curl -X GET "https://powertick-api-js.azurewebsites.net/api/demoMaxDemand?sn=DEMO0000003&time=month"
-  ```
-
-- **Query for the past year**:
-  ```bash
-  curl -X GET "https://powertick-api-js.azurewebsites.net/api/demoMaxDemand?sn=DEMO0000003&time=year"
-  ```
-
 
 ### `/api/demoConsumptionHistory` - GET
 
@@ -258,43 +187,13 @@ Below are examples of how to interact with each API endpoint using `curl`.
 
 ---
 
-### `/api/supportedModels` - GET
+### `/api/demoMaxDemand` - GET
 
-**Description**: Retrieve a list of supported powermeter models.
+**Description**: Retrieve max demand for a specific powermeter.
 
-**Example**:
+**Examples**:
 
-- **Query supported models**:
+- **Query for the past day**:
   ```bash
-  curl -X GET "https://powertick-api-js.azurewebsites.net/api/supportedModels"
-  ```
-
----
-
-### `/api/testDBconnection` - GET
-
-**Description**: Test the database connection.
-
-**Example**:
-
-- **Test database connection**:
-  ```bash
-  curl -X GET "https://powertick-api-js.azurewebsites.net/api/testDBconnection"
-  ```
-
----
-
-### `/api/httpTrigger1` - GET, POST
-
-**Description**: Sample trigger for testing.
-
-**Example**:
-
-- **Invoke the sample trigger**:
-  ```bash
-  curl -X GET "https://powertick-api-js.azurewebsites.net/api/httpTrigger1"
-  ```
-  or
-  ```bash
-  curl -X POST "https://powertick-api-js.azurewebsites.net/api/httpTrigger1"   -H "Content-Type: application/json"   -d '{ "sampleData": "test" }'
+  curl -X GET "https://powertick-api-js.azurewebsites.net/api/demoMaxDemand?sn=DEMO0000003&time=day"
   ```

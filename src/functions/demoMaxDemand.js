@@ -1,6 +1,6 @@
 /**
  * Author: Arturo Vargas Cuevas
- * Last Modified Date: 2024-11-21
+ * Last Modified Date: 21-11-2024
  *
  * This function serves as an HTTP GET endpoint to retrieve the maximum demand (total_real_power 
  * and reactive_power_var) for a specific powermeter based on the provided serial number (`sn`) and 

@@ -1,6 +1,6 @@
 /**
  * Author: Arturo Vargas Cuevas
- * Last Modified Date: 2024-11-21
+ * Last Modified Date: 21-11-2024
  *
  * This function serves as an HTTP POST endpoint to dynamically insert powermeter readings into the database.
  * It expects a JSON object containing valid variable names and values, verifies them against a predefined list of valid variables, 

@@ -1,6 +1,6 @@
 /**
  * Author: Arturo Vargas Cuevas
- * Last Modified Date: 2024-11-21
+ * Last Modified Date: 21-11-2024
  *
  * This module provides a database connection pool using the `pg` library for PostgreSQL.
  * It supports two environments:
