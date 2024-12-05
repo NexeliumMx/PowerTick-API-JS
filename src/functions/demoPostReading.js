@@ -1,13 +1,14 @@
 /**
  * Author: Arturo Vargas Cuevas
- * Last Modified Date: 21-11-2024
+ * Last Modified Date: 05-12-2024
  *
  * This function serves as an HTTP POST endpoint to dynamically insert powermeter readings into the database.
- * It expects a JSON object containing valid variable names and values, verifies them against a predefined list of valid variables, 
- * and ensures the timestamp is in a valid ISO 8601 format before inserting the data into the `demo.measurements` table.
+ * It expects a JSON object containing valid variable names and values, verifies them against the `measurements` section
+ * of `validVariablesNames.json`, and ensures the timestamp is in a valid ISO 8601 format before inserting the data 
+ * into the `demo.measurements` table.
  *
  * Conditions for the API to Work:
- * - All variable names in the JSON payload must exist in `validVariables.json`.
+ * - All variable names in the JSON payload must exist in the `measurements` section of `validVariablesNames.json`.
  * - The `timestamp` must be in ISO 8601 format (e.g., `2024-11-21T19:20:00.000Z` or `2024-11-21T19:20:00.000+00`).
  * - The database table `demo.measurements` must have columns matching the variable names in the JSON payload.
  *
@@ -28,13 +29,13 @@
 
 const { app } = require('@azure/functions');
 const { getClient } = require('./dbClient');
-const validVariables = require('./validVariables.json'); // Import valid variable names
+const validVariables = require('./validVariablesNames.json');
 
 app.http('demoPostReading', {
     methods: ['POST'],
     authLevel: 'anonymous',
     handler: async (request, context) => {
-        context.log(`Http function processed request for url "${request.url}"`);
+        context.log(`Http function processed request for URL "${request.url}"`);
 
         const client = await getClient(); // Initialize database client
 
@@ -43,16 +44,17 @@ app.http('demoPostReading', {
             const reading = await request.json();
             context.log("Received reading:", reading);
 
-            // Step 2: Verify all variable names against validVariables.json
+            // Step 2: Verify all variable names against the `measurements` section in validVariablesNames.json
+            const validKeys = validVariables.measurements; // Use the measurements section
             const invalidKeys = Object.keys(reading).filter(
-                (key) => !validVariables.validVariables.includes(key)
+                (key) => !validKeys.includes(key)
             );
 
             if (invalidKeys.length > 0) {
-                context.log("Invalid variable names found:", invalidKeys);
+                context.log.error("Invalid variable names found:", invalidKeys);
                 return {
                     status: 400,
-                    body: `Invalid variable names: ${invalidKeys.join(', ')}.`,
+                    body: `Invalid variable names: ${invalidKeys.join(', ')}.\nValid variable names: ${validKeys.join(', ')}`,
                 };
             }
 
@@ -60,7 +62,7 @@ app.http('demoPostReading', {
             const isoTimestampRegex =
                 /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})$/;
             if (!isoTimestampRegex.test(reading.timestamp)) {
-                context.log("Invalid timestamp format:", reading.timestamp);
+                context.log.error("Invalid timestamp format:", reading.timestamp);
                 return {
                     status: 400,
                     body: `Invalid timestamp format. Expected ISO format: YYYY-MM-DDTHH:mm:ss.sssZ or YYYY-MM-DDTHH:mm:ss.sss+00:00.`,

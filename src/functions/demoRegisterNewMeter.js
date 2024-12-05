@@ -1,95 +1,143 @@
 /**
  * Author: Arturo Vargas Cuevas
- * Last Modified Date: 02-12-2024
+ * Last Modified Date: 05-12-2024
  *
- * This function serves as an HTTP POST endpoint to register a new powermeter in the `demo` schema of the database.
- * It expects a JSON object with minimal meter details (only `serial_number` and `model` are required),
- * validates that all required fields are present, and automatically adds a hardcoded `client_id` and the current date as `register_date`.
- *
- * Key Features:
- * - Validates that the meter object contains required fields (`serial_number` and `model`).
- * - Adds a hardcoded `client_id` ('not_set') to each record.
- * - Dynamically constructs column names and values from the JSON attributes for flexibility.
+ * This function serves as an HTTP POST endpoint to register a new powermeter in the database.
+ * It dynamically validates the fields provided in the JSON payload against a predefined list 
+ * of valid field names (loaded from `validVariablesNames.json`). If validation passes, it 
+ * constructs an SQL query dynamically to insert the provided data into the `demo.powermeters` table.
  *
  * Example:
- * Register a new meter:
- * curl -X POST "http://localhost:7071/api/demoRegisterNewMeter" \
- -H "Content-Type: application/json" \
- -d '{ 
-      "serial_number": "DEMO0000013",
-      "model": "Accurev1335"
-  }'
+ * Register a new powermeter with only the serial number:
+ * curl -i -X POST http://localhost:7071/api/demoRegisterNewMeter \
+ * -H "Content-Type: application/json" \
+ * -d '{
+ *     "serial_number": "DEV0000006"
+ * }'
+ * 
+ * Register a new powermeter with additional fields:
+ * curl -i -X POST http://localhost:7071/api/demoRegisterNewMeter \
+ * -H "Content-Type: application/json" \
+ * -d '{
+ *     "serial_number": "DEV0000010",
+ *     "model": "Accurev1335",
+ *     "thd_enable": "1"
+ * }'
+ *
+ * Field Validation:
+ * The payload must only include valid fields. These fields are:
+ * [
+ *   "client_id", "serial_number", "manufacturer", "series", "model", 
+ *   "firmware_v", "branch", "location", "coordinates", "load_center", 
+ *   "register_date", "facturation_interval_months", "facturation_day", 
+ *   "time_zone", "device_address", "ct", "vt", "thd_enable"
+ * ]
+ * 
+ * Responses:
+ * 1. Success: 
+ *    HTTP 200 with a success message:
+ *    {
+ *        "message": "Powermeter DEV0000006 was registered successfully in demo.powermeters."
+ *    }
+ * 
+ * 2. Invalid Field Test:
+ *    curl -i -X POST http://localhost:7071/api/demoRegisterNewMeter \
+ *    -H "Content-Type: application/json" \
+ *    -d '{
+ *        "serial_number": "DEV0000011",
+ *        "invalid_field": "invalid"
+ *    }'
+ *
+ *    Result: A 400 Bad Request with an appropriate error message indicating the invalid field:
+ *    {
+ *        "error": "Invalid variable names detected.",
+ *        "invalidKeys": ["invalid_field"],
+ *        "validKeys": [
+ *            "client_id", "serial_number", "manufacturer", "series", "model", 
+ *            "firmware_v", "branch", "location", "coordinates", "load_center", 
+ *            "register_date", "facturation_interval_months", "facturation_day", 
+ *            "time_zone", "device_address", "ct", "vt", "thd_enable"
+ *        ]
+ *    }
+ * 
+ * 3. Duplicate Key Test:
+ *    curl -i -X POST http://localhost:7071/api/demoRegisterNewMeter -H "Content-Type: application/json" -d '{
+ *        "serial_number": "DEV0000006"
+ *    }'
+ *
+ *    Result: A 500 Internal Server Error with a clear message about the duplicate key:
+ *    {
+ *        "error": "duplicate key value violates unique constraint \"powermeters_pkey\""
+ *    }
+ *
+ * 4. Database Error:
+ *    Any other database-related errors are caught and returned as a 500 Internal Server Error with 
+ *    the error message provided by PostgreSQL.
  */
+
 
 const { app } = require('@azure/functions');
 const { getClient } = require('./dbClient');
+const fs = require('fs');
+const path = require('path');
+
+// Load valid variable names from JSON file
+const validVariablesPath = path.join(__dirname, './validVariablesNames.json');
+let validVariables;
+
+try {
+    validVariables = JSON.parse(fs.readFileSync(validVariablesPath)).powermeters;
+} catch (err) {
+    console.error('Failed to load valid variable names:', err.message);
+    process.exit(1); // Exit if the file cannot be loaded
+}
 
 app.http('demoRegisterNewMeter', {
     methods: ['POST'],
     authLevel: 'anonymous',
     handler: async (request, context) => {
-        context.log(`Http function processed request for URL "${request.url}"`);
+        const data = await request.json();
 
-        const client = await getClient(); // Await the database client initialization
-
-        try {
-            // Parse the JSON payload
-            const meter = await request.json();
-            context.log("Received request payload:", JSON.stringify(meter));
-
-            // Validate that the meter object contains required fields
-            const requiredFields = ['serial_number', 'model'];
-            for (const field of requiredFields) {
-                if (!meter[field]) {
-                    context.log(`Missing required field: ${field}`);
-                    return {
-                        status: 400,
-                        body: `Invalid meter data: Missing required field '${field}'.`,
-                    };
-                }
-            }
-
-            // Add hardcoded client_id
-            const meterWithDefaults = {
-                client_id: 'not_set', // Hardcoded value
-                ...meter,
+        // Validate keys against the valid variable list
+        const invalidKeys = Object.keys(data).filter(key => !validVariables.includes(key));
+        if (invalidKeys.length > 0) {
+            return {
+                status: 400,
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    error: "Invalid variable names detected.",
+                    invalidKeys,
+                    validKeys: validVariables
+                })
             };
-
-            // Dynamically construct column names and values from the JSON attributes
-            const columns = Object.keys(meterWithDefaults).join(', ');
-            const values = Object.values(meterWithDefaults)
-                .map((value, index) => `$${index + 1}`)
-                .join(', ');
-
-            // SQL query for insertion into the `demo` schema
-            const query = `
-                INSERT INTO demo.powermeters (${columns}, register_date)
-                VALUES (${values}, NOW())
-            `;
-            context.log("Constructed query:", query);
-
-            // Retry mechanism for transient errors
-            const maxRetries = 3;
-            for (let attempt = 1; attempt <= maxRetries; attempt++) {
-                try {
-                    await client.query(query, Object.values(meterWithDefaults));
-                    context.log(`Inserted meter with serial_number: ${meter.serial_number}`);
-                    break; // Exit loop on success
-                } catch (error) {
-                    context.log.warn(`Error inserting meter (Attempt ${attempt}):`, error.message);
-                    if (attempt === maxRetries) {
-                        throw error; // Rethrow error after all retries
-                    }
-                }
-            }
-
-            return { status: 200, body: 'Meter successfully registered in demo schema.' };
-        } catch (error) {
-            context.log.error('Error inserting meter:', error.stack);
-            return { status: 500, body: `Error: ${error.message}` };
-        } finally {
-            // Release the database client
-            client.release();
         }
-    },
+
+        // Build SQL query dynamically
+        const columns = Object.keys(data).join(", ");
+        const values = Object.keys(data).map((_, idx) => `$${idx + 1}`).join(", ");
+        const query = `INSERT INTO demo.powermeters (${columns}) VALUES (${values});`;
+
+        let client;
+        try {
+            client = await getClient();
+            await client.query(query, Object.values(data));
+
+            return {
+                status: 200,
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ message: `Powermeter ${data.serial_number} was registered successfully in demo.powermeters.` })
+            };
+        } catch (error) {
+            console.error('Error inserting powermeter:', error);
+            return {
+                status: 500,
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ error: error.message })
+            };
+        } finally {
+            if (client) {
+                client.release();
+            }
+        }
+    }
 });
