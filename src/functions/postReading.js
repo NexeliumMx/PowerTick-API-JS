@@ -2,19 +2,14 @@
  * Author: Arturo Vargas Cuevas
  * Last Modified Date: 05-12-2024
  *
- * This function serves as an HTTP POST endpoint to dynamically insert powermeter readings into the database.
- * It expects a JSON object containing valid variable names and values, verifies them against the `measurements` section
- * of `validVariablesNames.json`, and ensures the timestamp is in a valid ISO 8601 format before inserting the data 
- * into the `dev.measurements` table.
- *
- * Conditions for the API to Work:
- * - All variable names in the JSON payload must exist in the `measurements` section of `validVariablesNames.json`.
- * - The `timestamp` must be in ISO 8601 format (e.g., `2024-11-21T19:20:00.000Z` or `2024-11-21T19:20:00.000+00`).
- * - The database table `dev.measurements` must have columns matching the variable names in the JSON payload.
+ * This function serves as an HTTP POST endpoint to register a new reading in the database.
+ * It dynamically validates the fields provided in the JSON payload against a predefined list 
+ * of valid field names (loaded from `validVariablesNames.json`). If validation passes, it 
+ * constructs an SQL query dynamically to insert the provided data into the `dev.measurements` table.
  *
  * Example:
- * Insert a new powermeter reading:
- * curl -X POST "http://localhost:7071/api/postReading" \
+ * Register a new reading:
+ * curl -i -X POST http://localhost:7071/api/postReading \
  * -H "Content-Type: application/json" \
  * -d '{
  *     "timestamp": "2024-12-05T18:00:00.000Z",
@@ -25,79 +20,88 @@
  *     "amps_phase_c": 522,
  *     "voltage_ln_average": 126
  * }'
+ *
+ * Responses:
+ * 1. Success: 
+ *    HTTP 200 with a success message:
+ *    {
+ *        "message": "Reading for serial number DEV0000001 was registered successfully in dev.measurements."
+ *    }
+ *
+ * 2. Invalid Field Test:
+ *    Result: A 400 Bad Request with an error message indicating the invalid field(s):
+ *    {
+ *        "error": "Invalid variable names detected.",
+ *        "invalidKeys": ["invalid_field"],
+ *        "validKeys": [ list of valid keys ]
+ *    }
+ *
+ * 3. Database Error:
+ *    Result: A 500 Internal Server Error with the error message from PostgreSQL.
  */
 
 const { app } = require('@azure/functions');
 const { getClient } = require('./dbClient');
-const validVariables = require('./validVariablesNames.json'); // Import valid variable names
+const fs = require('fs');
+const path = require('path');
+
+// Load valid variable names from JSON file
+const validVariablesPath = path.join(__dirname, './validVariablesNames.json');
+let validVariables;
+
+try {
+    validVariables = JSON.parse(fs.readFileSync(validVariablesPath)).measurements;
+} catch (err) {
+    console.error('Failed to load valid variable names:', err.message);
+    process.exit(1); // Exit if the file cannot be loaded
+}
 
 app.http('postReading', {
     methods: ['POST'],
     authLevel: 'anonymous',
     handler: async (request, context) => {
-        context.log(`Http function processed request for URL "${request.url}"`);
+        const data = await request.json();
 
-        const client = await getClient(); // Initialize database client
+        // Validate keys against the valid variable list
+        const invalidKeys = Object.keys(data).filter(key => !validVariables.includes(key));
+        if (invalidKeys.length > 0) {
+            return {
+                status: 400,
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    error: "Invalid variable names detected.",
+                    invalidKeys,
+                    validKeys: validVariables
+                })
+            };
+        }
 
+        // Build SQL query dynamically
+        const columns = Object.keys(data).join(", ");
+        const values = Object.keys(data).map((_, idx) => `$${idx + 1}`).join(", ");
+        const query = `INSERT INTO dev.measurements (${columns}) VALUES (${values});`;
+
+        let client;
         try {
-            // Step 1: Parse the JSON payload
-            const reading = await request.json();
-            context.log("Received reading:", reading);
-
-            // Step 2: Verify all variable names against the `measurements` section in validVariablesNames.json
-            const validKeys = validVariables.measurements; // Use the measurements section
-            const invalidKeys = Object.keys(reading).filter(
-                (key) => !validKeys.includes(key)
-            );
-
-            if (invalidKeys.length > 0) {
-                context.log.error("Invalid variable names found:", invalidKeys);
-                return {
-                    status: 400,
-                    body: `Invalid variable names: ${invalidKeys.join(', ')}.\nValid variable names: ${validKeys.join(', ')}`,
-                };
-            }
-
-            // Step 3: Verify the timestamp is in valid ISO format
-            const isoTimestampRegex =
-                /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})$/;
-            if (!isoTimestampRegex.test(reading.timestamp)) {
-                context.log.error("Invalid timestamp format:", reading.timestamp);
-                return {
-                    status: 400,
-                    body: `Invalid timestamp format. Expected ISO format: YYYY-MM-DDTHH:mm:ss.sssZ or YYYY-MM-DDTHH:mm:ss.sss+00:00.`,
-                };
-            }
-
-            // Step 4: Dynamically construct the SQL query
-            const columns = Object.keys(reading).join(', ');
-            const values = Object.values(reading)
-                .map((_, index) => `$${index + 1}`)
-                .join(', ');
-
-            const query = `
-                INSERT INTO dev.measurements (${columns})
-                VALUES (${values})
-            `;
-            context.log("Constructed query:", query);
-
-            // Execute the query
-            await client.query(query, Object.values(reading));
-            context.log("Inserted reading successfully.");
+            client = await getClient();
+            await client.query(query, Object.values(data));
 
             return {
                 status: 200,
-                body: "Reading successfully inserted into the database.",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ message: `Reading for serial number ${data.serial_number} was registered successfully in dev.measurements.` })
             };
         } catch (error) {
-            context.log.error("Error inserting reading:", error);
+            console.error('Error inserting reading:', error);
             return {
                 status: 500,
-                body: `Error: ${error.message}`,
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ error: error.message })
             };
         } finally {
-            // Release the database client
-            client.release();
+            if (client) {
+                client.release();
+            }
         }
-    },
+    }
 });

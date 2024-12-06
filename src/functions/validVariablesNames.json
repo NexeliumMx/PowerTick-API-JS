@@ -15,8 +15,8 @@
     "facturation_day",
     "time_zone",
     "device_address",
-    "ct",
-    "vt",
+    "ct_ratio",
+    "vt_ratio",
     "thd_enable"
   ],
   "measurements": [

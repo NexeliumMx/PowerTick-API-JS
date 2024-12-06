@@ -8,6 +8,22 @@ The PowerTick Node.js API is built with Azure Functions and provides endpoints t
 
 ## API Endpoints
 
+### Public API Endpoints
+
+| **Endpoint**                                         | **Method** | **Description**                                 |
+|------------------------------------------------------|------------|-------------------------------------------------|
+| [`/api/supportedModels`](#apisupportedmodels)        | GET        | Retrieve a list of supported powermeter models. |
+
+### Dev API Endpoints
+
+| **Endpoint**                                         | **Method** | **Description**                                         |
+|------------------------------------------------------|------------|---------------------------------------------------------|
+| [`/api/powermeter`](#apipowermeter)  | GET, POST  | Retrieve all powermeters in the database.               |
+| [`/api/postReading`](#apipostreading)               | POST       | Submit a new reading for a powermeter.                  |
+
+
+
+
 ### Demo API Endpoints
 
 | **Endpoint**                                         | **Method** | **Description**                                         |
@@ -21,21 +37,6 @@ The PowerTick Node.js API is built with Azure Functions and provides endpoints t
 | [`/api/demoPowerMeterInfo`](#apidemopowermeterinfo)           | GET        | Retrieve specific information for a powermeter.         |
 | [`/api/demoRealtimeData`](#apidemorealtimedata)              | GET        | Retrieve the latest real-time data for a powermeter.    |
 | [`/api/demoRegisterNewMeter`](#apidemoregisternewmeter)      | POST       | Register a new powermeter into the database.            |
-
-### Public API Endpoints
-
-| **Endpoint**                                         | **Method** | **Description**                                 |
-|------------------------------------------------------|------------|-------------------------------------------------|
-| [`/api/supportedModels`](#apisupportedmodels)        | GET        | Retrieve a list of supported powermeter models. |
-
-### Dev API Endpoints
-
-| **Endpoint**                                         | **Method** | **Description**                                         |
-|------------------------------------------------------|------------|---------------------------------------------------------|
-| [`/api/getPowerMetersInfo`](#apigetpowermetersinfo)  | GET        | Retrieve all powermeters in the database.               |
-| [`/api/postReading`](#apipostreading)               | POST       | Submit a new reading for a powermeter.                  |
-| [`/api/registerNewMeter`](#apiregisternewmeter)      | POST       | Register a new powermeter into the database.            |
-| [`/api/powerMeterInfo`](#apipowermeterinfo)          | GET        | Retrieve specific information for a powermeter.         |
 
 ### Test API Endpoints
 
@@ -66,6 +67,133 @@ The PowerTick Node.js API is built with Azure Functions and provides endpoints t
 ---
 
 ## Usage Examples
+
+### `/api/powermeter`
+
+**Description**: This function serves as an HTTP endpoint to manage powermeters in the database.
+
+It provides:
+1. **POST**: Register a new powermeter.
+2. **GET**: Retrieve a powermeter by serial number.
+
+---
+
+### POST: Register a new powermeter
+
+Register a new powermeter in the database. The payload must include a valid set of fields.
+
+**Example**:
+```bash
+curl -i -X POST https://power-tick-api-js.nexelium.mx/api/powermeter \
+-H "Content-Type: application/json" \
+-d '{
+    "serial_number": "DEV0000010",
+    "model": "Accurev1335",
+    "thd_enable": "1"
+}'
+```
+
+**Expected Responses**:
+1. **Success**:
+    ```json
+    HTTP 200
+    {
+        "message": "Powermeter DEV0000010 was registered successfully in dev.powermeters."
+    }
+    ```
+
+2. **Invalid Field(s)**:
+    ```json
+    HTTP 400
+    {
+        "error": "Invalid variable names detected.",
+        "invalidKeys": ["invalid_field"],
+        "validKeys": [
+            "client_id", "serial_number", "manufacturer", "series", "model",
+            "firmware_v", "branch", "location", "coordinates", "load_center",
+            "register_date", "facturation_interval_months", "facturation_day",
+            "time_zone", "device_address", "ct", "vt", "thd_enable"
+        ]
+    }
+    ```
+
+3. **Database Error (e.g., duplicate key)**:
+    ```json
+    HTTP 500
+    {
+        "error": "duplicate key value violates unique constraint "powermeters_pkey""
+    }
+    ```
+
+---
+
+### GET: Retrieve a powermeter by serial number
+
+Retrieve a powermeter by its serial number (`sn` query parameter).
+
+**Example**:
+```bash
+curl -X GET https://power-tick-api-js.nexelium.mx/api/powermeter?sn=DEV0000010
+```
+
+**Expected Responses**:
+1. **Success**:
+    ```json
+    HTTP 200
+    {
+        "serial_number": "DEV0000010",
+        "model": "Accurev1335",
+        "thd_enable": "1",
+        ...
+    }
+    ```
+
+2. **Missing `sn` Parameter**:
+    ```json
+    HTTP 400
+    {
+        "error": "Missing required query parameter: sn"
+    }
+    ```
+
+3. **No Matching Powermeter**:
+    ```json
+    HTTP 404
+    {
+        "error": "No powermeter found with serial number: DEV9999999"
+    }
+    ```
+
+4. **Database Error**:
+    ```json
+    HTTP 500
+    {
+        "error": "<database error message>"
+    }
+    ```
+
+---
+
+### `/api/postReading`
+
+**Description**: Submit a new reading for a powermeter.
+
+**Example**:
+
+- **Insert a new powermeter reading**:
+  ```bash
+  curl -X POST "https://power-tick-api-js.nexelium.mx/api/postReading"   -H "Content-Type: application/json"   -d '{
+      "timestamp": "2024-11-21T19:20:00.000Z",
+      "serial_number": "DEMO0000001",
+      "amps_total": 1182,
+      "amps_phase_a": 170,
+      "amps_phase_b": 490,
+      "amps_phase_c": 522,
+      "voltage_ln_average": 126
+  }'
+  ```
+
+---
 
 ### `/api/demoConsumptionHistory`
 
@@ -238,40 +366,6 @@ The PowerTick Node.js API is built with Azure Functions and provides endpoints t
 - **Retrieve supported models**:
   ```bash
   curl -X GET "https://power-tick-api-js.nexelium.mx/api/supportedModels"
-  ```
-
----
-
-### `/api/getPowerMetersInfo`
-
-**Description**: Retrieve all powermeters in the database.
-
-**Example**:
-
-- **Retrieve all powermeter data**:
-  ```bash
-  curl -X GET "https://power-tick-api-js.nexelium.mx/api/getPowerMetersInfo"
-  ```
-
----
-
-### `/api/postReading`
-
-**Description**: Submit a new reading for a powermeter.
-
-**Example**:
-
-- **Insert a new powermeter reading**:
-  ```bash
-  curl -X POST "https://power-tick-api-js.nexelium.mx/api/postReading"   -H "Content-Type: application/json"   -d '{
-      "timestamp": "2024-11-21T19:20:00.000Z",
-      "serial_number": "DEMO0000001",
-      "amps_total": 1182,
-      "amps_phase_a": 170,
-      "amps_phase_b": 490,
-      "amps_phase_c": 522,
-      "voltage_ln_average": 126
-  }'
   ```
 
 ---
