@@ -34,7 +34,7 @@ app.http('demoConsumptionHistory', {
                 };
             }
 
-            if (!timeRange || (timeRange !== 'hour' && timeRange !== 'year')) {
+            if (!timeRange || (timeRange !== 'hour' && timeRange !== 'year' && timeRange !== 'week')) {
                 return {
                     status: 400,
                     body: { error: "Invalid or missing 'time' query parameter. Expected 'hour' or 'year'." }
@@ -62,8 +62,10 @@ app.http('demoConsumptionHistory', {
             const timeZone = timeZoneResult.rows[0].time_zone;
 
             let query;
+            let expectedElements;
             if (timeRange === 'hour') {
                 // Original query for hourly data
+                expectedElements=13
                 query = `
                     SELECT
                         "timestamp",
@@ -76,6 +78,7 @@ app.http('demoConsumptionHistory', {
                     ORDER BY "timestamp" DESC;
                 `;
             } else if (timeRange === 'year') {
+                expectedElements=105121
                 query = `
                     WITH monthly_latest AS (
                         SELECT
@@ -100,17 +103,68 @@ app.http('demoConsumptionHistory', {
 
                 `;
             }
-
+            else if (timeRange=='week'){
+                expectedElements=2017
+                query = `
+                    SELECT
+                        "timestamp",
+                        "total_real_energy_imported",
+                        "total_var_hours_imported_q1"
+                    FROM "demo"."measurements"
+                    WHERE "serial_number" = $1
+                      AND "timestamp" >= NOW() - INTERVAL '1 week' - INTERVAL '5 minutes'
+                      AND "timestamp" < NOW()
+                    ORDER BY "timestamp" DESC;
+                `;
+            }
+            else if (timeRange=='day'){
+                expectedElements=289
+                query = `
+                    SELECT
+                        "timestamp",
+                        "total_real_energy_imported",
+                        "total_var_hours_imported_q1"
+                    FROM "demo"."measurements"
+                    WHERE "serial_number" = $1
+                      AND "timestamp" >= NOW() - INTERVAL '1 day' - INTERVAL '5 minutes'
+                      AND "timestamp" < NOW()
+                    ORDER BY "timestamp" DESC;
+                `;
+            }
+            //else if (timeRange=='custom'){
+            //    expectedElements=288
+            //    query = `
+             //       SELECT
+             //           "timestamp",
+               //         "total_real_energy_imported",
+                 //       "total_var_hours_imported_q1"
+            //        FROM "demo"."measurements"
+            //        WHERE "serial_number" = $1
+            //          AND "timestamp" >= NOW() - INTERVAL '1 day' - INTERVAL '5 minutes'
+            //          AND "timestamp" < NOW()
+            //        ORDER BY "timestamp" DESC;
+            //    `;
+            //}
             const queryParams = timeRange === 'hour' ? [serialNumber] : [serialNumber, timeZone];
             const result = await client.query(query, queryParams);
             client.release();
 
             // Return serialized JSON response
+            if (result.length==expectedElements){
             return {
                 status: 200,
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(result.rows)
-            };
+            };}
+            else {
+                return {
+                    status: 206,
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(result.rows)
+
+                    
+                };
+            }
         } catch (error) {
             context.log.error("Error executing query:", error);
             return {
