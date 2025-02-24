@@ -7,7 +7,7 @@
  *
  * Example:
  * Test database connection:
- * curl -X GET "http://localhost:7071/api/testDBconnection"
+ * curl -i -X GET "http://localhost:7071/api/testDBconnection"
  *
  * Expected Response:
  * {"success":true,"message":"Connection test successful"}
