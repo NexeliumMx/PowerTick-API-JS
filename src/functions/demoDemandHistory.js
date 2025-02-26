@@ -15,7 +15,7 @@
  * 
  * ---------------------------------------------------------------------------
  * Code Description:
- * 1. Query Parameters: The function expects a query parameter `time_interval` to specify the time interval for the data retrieval.
+ * 1. Query Parameters: The function expects query parameters `user_id`, `serial_number`, and `time_interval` to specify the user, powermeter, and time interval for the data retrieval.
  *
  * 2. Database Connection: It connects to the PostgreSQL database using a client from dbClient.js.
  *
@@ -28,11 +28,11 @@
  * Example:
  * Fetch demand history data for a powermeter:
  * Local:
- *    curl -i -X GET "http://localhost:7071/api/demoDemandHistory?time_interval=day"
- *    curl -i -X GET "http://localhost:7071/api/demoDemandHistory?time_interval=hour"
+ *    curl -i -X GET "http://localhost:7071/api/demoDemandHistory?user_id=4c7c56fe-99fc-4611-b57a-0d5683f9bc95&serial_number=DEMO000001&time_interval=hour"
+ *    curl -i -X GET "http://localhost:7071/api/demoDemandHistory?user_id=4c7c56fe-99fc-4611-b57a-0d5683f9bc95&serial_number=DEMO000001&time_interval=day"
  * Production:
- *    curl -i -X GET "https://power-tick-api-js.nexelium.mx/api/demoDemandHistory?time_interval=day"
- *    curl -i -X GET "https://power-tick-api-js.nexelium.mx/api/demoDemandHistory?time_interval=hour"
+ *    curl -i -X GET "https://power-tick-api-js.nexelium.mx/api/demoDemandHistory?user_id=4c7c56fe-99fc-4611-b57a-0d5683f9bc95&serial_number=DEMO000001&time_interval=hour"
+ *    curl -i -X GET "https://power-tick-api-js.nexelium.mx/api/demoDemandHistory?user_id=4c7c56fe-99fc-4611-b57a-0d5683f9bc95&serial_number=DEMO000001&time_interval=day"
  *
  * Expected Response:
  * [{"timestamp_utc":"2025-02-25T02:30:00.000Z","timestamp_tz":"2025-02-25T02:30:00.000Z","real_power_w":1935436,"reactive_power_var":742491}, ...]
@@ -48,8 +48,19 @@ app.http('demoDemandHistory', {
     handler: async (request, context) => {
         context.log(`Http function processed request for url "${request.url}"`);
 
+        const userId = request.query.get('user_id');
+        const serialNumber = request.query.get('serial_number');
         const timeInterval = request.query.get('time_interval');
-        context.log(`Received time_interval: ${timeInterval}`);
+        context.log(`Received user_id: ${userId}, serial_number: ${serialNumber}, time_interval: ${timeInterval}`);
+
+        if (!userId || !serialNumber || !timeInterval) {
+            context.log('user_id, serial_number, or time_interval is missing in the request');
+            return {
+                status: 400,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ success: false, message: 'user_id, serial_number, and time_interval are required' })
+            };
+        }
 
         let query;
         if (timeInterval === 'hour') {
@@ -63,8 +74,8 @@ app.http('demoDemandHistory', {
                     JOIN 
                         demo.user_installations ui ON p.installation_id = ui.installation_id
                     WHERE 
-                        ui.user_id = '4c7c56fe-99fc-4611-b57a-0d5683f9bc95' -- Replace with the actual user_id
-                        AND p.serial_number = 'DEMO000001' -- Replace with the actual serial_number
+                        ui.user_id = $1
+                        AND p.serial_number = $2
                 ),
                 powermeter_time_zone AS (
                     SELECT 
@@ -72,7 +83,7 @@ app.http('demoDemandHistory', {
                     FROM 
                         demo.powermeters
                     WHERE 
-                        serial_number = 'DEMO000001' -- Replace with the actual serial_number
+                        serial_number = $2
                 )
                 SELECT 
                     "timestamp_utc",
@@ -82,7 +93,7 @@ app.http('demoDemandHistory', {
                 FROM 
                     demo.measurements
                 WHERE 
-                    serial_number = 'DEMO000001'
+                    serial_number = $2
                     AND "timestamp_tz" < NOW() AT TIME ZONE (SELECT time_zone FROM powermeter_time_zone)
                     AND "timestamp_utc" > NOW() - INTERVAL '1 hour'
                     AND EXISTS (SELECT 1 FROM user_access)
@@ -100,8 +111,8 @@ app.http('demoDemandHistory', {
                     JOIN 
                         demo.user_installations ui ON p.installation_id = ui.installation_id
                     WHERE 
-                        ui.user_id = '4c7c56fe-99fc-4611-b57a-0d5683f9bc95' -- Replace with the actual user_id
-                        AND p.serial_number = 'DEMO000001' -- Replace with the actual serial_number
+                        ui.user_id = $1
+                        AND p.serial_number = $2
                 ),
                 powermeter_time_zone AS (
                     SELECT 
@@ -109,7 +120,7 @@ app.http('demoDemandHistory', {
                     FROM 
                         demo.powermeters
                     WHERE 
-                        serial_number = 'DEMO000001' -- Replace with the actual serial_number
+                        serial_number = $2
                 )
                 SELECT 
                     "timestamp_utc",
@@ -119,7 +130,7 @@ app.http('demoDemandHistory', {
                 FROM 
                     demo.measurements
                 WHERE 
-                    serial_number = 'DEMO000001'
+                    serial_number = $2
                     AND "timestamp_tz" < NOW() AT TIME ZONE (SELECT time_zone FROM powermeter_time_zone)
                     AND "timestamp_utc" > NOW() - INTERVAL '24 hours'
                     AND EXISTS (SELECT 1 FROM user_access)
@@ -137,8 +148,9 @@ app.http('demoDemandHistory', {
         try {
             const client = await getClient();  // Reuse the connected client from dbClient.js
 
-            context.log(`Executing query`);
-            const res = await client.query(query);
+            const values = [userId, serialNumber];
+            context.log(`Executing query with values: ${values}`);
+            const res = await client.query(query, values);
             client.release(); // Release client back to the pool
 
             context.log("Database query executed successfully");
