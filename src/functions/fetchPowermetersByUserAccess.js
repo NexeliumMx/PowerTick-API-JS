@@ -30,7 +30,10 @@
  * ---------------------------------------------------------------------------
  * Example:
  * Fetch powermeters by user access:
- * curl -i -X GET "http://localhost:7071/api/fetchPowermetersByUserAccess?user_id=4c7c56fe-99fc-4611-b57a-0d5683f9bc95"
+ * Local:
+ *    curl -i -X GET "http://localhost:7071/api/fetchPowermetersByUserAccess?user_id=4c7c56fe-99fc-4611-b57a-0d5683f9bc95"
+ * Production:
+ *    curl -i -X GET "https://power-tick-api-js.nexelium.mx/api/fetchPowermetersByUserAccess?user_id=4c7c56fe-99fc-4611-b57a-0d5683f9bc95"
  *
  * Expected Response:
  * [{"serial_number":"12345","client_id":"67890","client_alias":"Client Alias","installation_id":"abcde","installation_alias":"Installation Alias"}, ...]

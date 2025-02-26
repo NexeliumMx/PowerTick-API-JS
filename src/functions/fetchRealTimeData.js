@@ -29,7 +29,10 @@
  * ---------------------------------------------------------------------------
  * Example:
  * Fetch real-time data for a powermeter:
- * curl -i -X GET "http://localhost:7071/api/fetchRealTimeData?user_id=4c7c56fe-99fc-4611-b57a-0d5683f9bc95&serial_number=DEMO000001"
+ * Local:
+ *    curl -i -X GET "http://localhost:7071/api/fetchRealTimeData?user_id=4c7c56fe-99fc-4611-b57a-0d5683f9bc95&serial_number=DEMO000001"
+ * Production:
+ *    curl -i -X GET "https://power-tick-api-js.nexelium.mx/api/fetchRealTimeData?user_id=4c7c56fe-99fc-4611-b57a-0d5683f9bc95&serial_number=DEMO000001"
  *
  * Expected Response:
  * [{"serial_number":"DEMO000001","timestamp_tz":"2025-02-24T16:38:22Z","total_real_power":123.45,"reactive_power_var":67.89}, ...]

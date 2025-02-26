@@ -30,6 +30,7 @@ let pool;
 // Function to initialize and return a connection pool
 async function initPool() {
     if (pool) {
+        console.log("Reusing existing connection pool.");
         return pool;  // Reuse the existing pool if already created
     }
 
@@ -70,6 +71,7 @@ async function initPool() {
 // Export function to get a client from the pool
 async function getClient() {
     const pool = await initPool();
+    console.log("Fetching a client from the pool.");
     return pool.connect(); // Returns a pooled client
 }
 
