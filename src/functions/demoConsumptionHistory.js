@@ -28,11 +28,11 @@
  * Example:
  * Fetch consumption history data for a powermeter:
  * Local:
- *    curl -i -X GET "http://localhost:7071/api/demoConsumptionHistory?user_id=4c7c56fe-99fc-4611-b57a-0d5683f9bc95&serial_number=DEMO000001&time_interval=day"
  *    curl -i -X GET "http://localhost:7071/api/demoConsumptionHistory?user_id=4c7c56fe-99fc-4611-b57a-0d5683f9bc95&serial_number=DEMO000001&time_interval=hour"
+ *    curl -i -X GET "http://localhost:7071/api/demoConsumptionHistory?user_id=4c7c56fe-99fc-4611-b57a-0d5683f9bc95&serial_number=DEMO000001&time_interval=day"
  * Production:
- *    curl -i -X GET "https://power-tick-api-js.nexelium.mx/api/demoConsumptionHistory?user_id=4c7c56fe-99fc-4611-b57a-0d5683f9bc95&serial_number=DEMO000001&time_interval=day"
  *    curl -i -X GET "https://power-tick-api-js.nexelium.mx/api/demoConsumptionHistory?user_id=4c7c56fe-99fc-4611-b57a-0d5683f9bc95&serial_number=DEMO000001&time_interval=hour"
+ *    curl -i -X GET "https://power-tick-api-js.nexelium.mx/api/demoConsumptionHistory?user_id=4c7c56fe-99fc-4611-b57a-0d5683f9bc95&serial_number=DEMO000001&time_interval=day"
  *
  * Expected Response:
  * [{"timestamp_utc":"2025-02-25T02:30:00.000Z","timestamp_tz":"2025-02-25T02:30:00.000Z","real_energy_wh":1935436,"reactive_energy_varh":742491}, ...]
