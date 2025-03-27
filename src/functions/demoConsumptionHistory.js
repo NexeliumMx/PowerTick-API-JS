@@ -88,8 +88,8 @@ app.http('demoConsumptionHistory', {
                 SELECT 
                     "timestamp_utc",
                     "timestamp_tz",
-                    total_real_energy_imported AS real_energy_wh,
-                    total_var_hours_imported_q1 AS reactive_energy_varh
+                    kwh_imported_total AS real_energy_wh,
+                    varh_imported_q1 AS reactive_energy_varh
                 FROM 
                     demo.measurements
                 WHERE 
@@ -125,8 +125,8 @@ app.http('demoConsumptionHistory', {
                 SELECT 
                     "timestamp_utc",
                     "timestamp_tz",
-                    total_real_energy_imported AS real_energy_wh,
-                    total_var_hours_imported_q1 AS reactive_energy_varh
+                    kwh_imported_total AS real_energy_wh,
+                    varh_imported_q1 AS reactive_energy_varh
                 FROM 
                     demo.measurements
                 WHERE 

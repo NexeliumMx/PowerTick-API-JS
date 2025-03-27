@@ -93,8 +93,8 @@ app.http('demoConsumptionProfile', {
                     SELECT 
                         "timestamp_tz", 
                         "timestamp_utc",
-                        total_real_energy_imported, 
-                        total_var_hours_imported_q1,
+                        kwh_imported_total, 
+                        varh_imported_q1,
                         date_trunc('hour', "timestamp_tz") AS hour,
                         date_trunc('hour', "timestamp_utc") AS hour_utc
                     FROM 
@@ -111,8 +111,8 @@ app.http('demoConsumptionProfile', {
                         hour,
                         hour_utc,
                         "timestamp_tz",
-                        total_real_energy_imported,
-                        total_var_hours_imported_q1
+                        kwh_imported_total,
+                        varh_imported_q1
                     FROM 
                         last_entries
                     ORDER BY 
@@ -121,16 +121,16 @@ app.http('demoConsumptionProfile', {
                 previous_hour_data AS (
                     SELECT 
                         hour,
-                        LAG(total_real_energy_imported) OVER (ORDER BY hour) AS prev_real_energy_imported,
-                        LAG(total_var_hours_imported_q1) OVER (ORDER BY hour) AS prev_var_hours_imported
+                        LAG(kwh_imported_total) OVER (ORDER BY hour) AS prev_real_energy_imported,
+                        LAG(varh_imported_q1) OVER (ORDER BY hour) AS prev_var_hours_imported
                     FROM 
                         hourly_data
                 )
                 SELECT 
                     TO_CHAR(hd.hour_utc, 'YYYY-MM-DD HH24') || '-' || TO_CHAR(hd.hour_utc + INTERVAL '1 hour', 'HH24') AS consumption_profile_hour_range_utc,
                     TO_CHAR(hd.hour, 'YYYY-MM-DD HH24') || '-' || TO_CHAR(hd.hour + INTERVAL '1 hour', 'HH24') AS consumption_profile_hour_range_tz,
-                    hd.total_real_energy_imported - phd.prev_real_energy_imported AS real_energy_wh,
-                    hd.total_var_hours_imported_q1 - phd.prev_var_hours_imported AS reactive_energy_varh
+                    hd.kwh_imported_total - phd.prev_real_energy_imported AS real_energy_wh,
+                    hd.varh_imported_q1 - phd.prev_var_hours_imported AS reactive_energy_varh
                 FROM 
                     hourly_data hd
                 JOIN 
@@ -165,8 +165,8 @@ app.http('demoConsumptionProfile', {
                 last_entries AS (
                     SELECT 
                         "timestamp_tz", 
-                        total_real_energy_imported, 
-                        total_var_hours_imported_q1,
+                        kwh_imported_total, 
+                        varh_imported_q1,
                         date_trunc('day', "timestamp_tz") AS day
                     FROM 
                         demo.measurements
@@ -181,8 +181,8 @@ app.http('demoConsumptionProfile', {
                     SELECT DISTINCT ON (day)
                         day,
                         "timestamp_tz",
-                        total_real_energy_imported,
-                        total_var_hours_imported_q1
+                        kwh_imported_total,
+                        varh_imported_q1
                     FROM 
                         last_entries
                     ORDER BY 
@@ -191,15 +191,15 @@ app.http('demoConsumptionProfile', {
                 previous_day_data AS (
                     SELECT 
                         day,
-                        LAG(total_real_energy_imported) OVER (ORDER BY day) AS prev_real_energy_imported,
-                        LAG(total_var_hours_imported_q1) OVER (ORDER BY day) AS prev_var_hours_imported
+                        LAG(kwh_imported_total) OVER (ORDER BY day) AS prev_real_energy_imported,
+                        LAG(varh_imported_q1) OVER (ORDER BY day) AS prev_var_hours_imported
                     FROM 
                         daily_data
                 )
                 SELECT 
                     TO_CHAR(dd.day, 'YYYY-MM-DD') AS consumption_profile_day_range_tz,
-                    dd.total_real_energy_imported - pdd.prev_real_energy_imported AS real_energy_wh,
-                    dd.total_var_hours_imported_q1 - pdd.prev_var_hours_imported AS reactive_energy_varh
+                    dd.kwh_imported_total - pdd.prev_real_energy_imported AS real_energy_wh,
+                    dd.varh_imported_q1 - pdd.prev_var_hours_imported AS reactive_energy_varh
                 FROM 
                     daily_data dd
                 JOIN 
@@ -234,8 +234,8 @@ app.http('demoConsumptionProfile', {
                 last_entries AS (
                     SELECT 
                         "timestamp_tz", 
-                        total_real_energy_imported, 
-                        total_var_hours_imported_q1,
+                        kwh_imported_total, 
+                        varh_imported_q1,
                         date_trunc('month', "timestamp_tz") AS month
                     FROM 
                         demo.measurements
@@ -250,8 +250,8 @@ app.http('demoConsumptionProfile', {
                     SELECT DISTINCT ON (month)
                         month,
                         "timestamp_tz",
-                        total_real_energy_imported,
-                        total_var_hours_imported_q1
+                        kwh_imported_total,
+                        varh_imported_q1
                     FROM 
                         last_entries
                     ORDER BY 
@@ -260,15 +260,15 @@ app.http('demoConsumptionProfile', {
                 previous_month_data AS (
                     SELECT 
                         month,
-                        LAG(total_real_energy_imported) OVER (ORDER BY month) AS prev_real_energy_imported,
-                        LAG(total_var_hours_imported_q1) OVER (ORDER BY month) AS prev_var_hours_imported
+                        LAG(kwh_imported_total) OVER (ORDER BY month) AS prev_real_energy_imported,
+                        LAG(varh_imported_q1) OVER (ORDER BY month) AS prev_var_hours_imported
                     FROM 
                         monthly_data
                 )
                 SELECT 
                     TO_CHAR(md.month, 'YYYY-MM') AS consumption_profile_month_range_tz,
-                    md.total_real_energy_imported - pmd.prev_real_energy_imported AS real_energy_wh,
-                    md.total_var_hours_imported_q1 - pmd.prev_var_hours_imported AS reactive_energy_varh
+                    md.kwh_imported_total - pmd.prev_real_energy_imported AS real_energy_wh,
+                    md.varh_imported_q1 - pmd.prev_var_hours_imported AS reactive_energy_varh
                 FROM 
                     monthly_data md
                 JOIN 

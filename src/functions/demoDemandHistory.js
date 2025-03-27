@@ -88,8 +88,8 @@ app.http('demoDemandHistory', {
                 SELECT 
                     "timestamp_utc",
                     "timestamp_tz",
-                    total_real_power AS real_power_w,
-                    reactive_power_var AS reactive_power_var
+                    watts AS real_power_w,
+                    var AS reactive_power_var
                 FROM 
                     demo.measurements
                 WHERE 
@@ -125,8 +125,8 @@ app.http('demoDemandHistory', {
                 SELECT 
                     "timestamp_utc",
                     "timestamp_tz",
-                    total_real_power AS real_power_w,
-                    reactive_power_var AS reactive_power_var
+                    watts AS real_power_w,
+                    var AS reactive_power_var
                 FROM 
                     demo.measurements
                 WHERE 

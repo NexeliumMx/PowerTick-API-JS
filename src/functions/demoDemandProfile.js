@@ -39,7 +39,7 @@
  *    curl -i -X GET "https://power-tick-api-js.nexelium.mx/api/demoDemandProfile?user_id=4c7c56fe-99fc-4611-b57a-0d5683f9bc95&serial_number=DEMO000001&time_interval=year"
  *
  * Expected Response:
- * [{"demand_profile_hour_range_utc":"2025-02-23 23-00","demand_profile_hour_range_tz":"2025-02-23 17-18","avg_real_power_w":123.45,"max_real_power_w":150.67,"avg_reactive_power_var":67.89,"max_reactive_power_var":80.12}, ...]
+ * [{"demand_profile_hour_range_utc":"2025-02-23 23-00","demand_profile_hour_range_tz":"2025-02-23 17-18","avg_real_power_w":123.45,"max_real_power_w":150.67,"avg_var":67.89,"max_var":80.12}, ...]
  * --------------------------------------------------------------------------- 
 */
 
@@ -93,10 +93,10 @@ app.http('demoDemandProfile', {
                     SELECT 
                         date_trunc('hour', "timestamp_tz") AS hour,
                         date_trunc('hour', "timestamp_utc") AS hour_utc,
-                        AVG(total_real_power) AS avg_total_real_power,
-                        MAX(total_real_power) AS max_total_real_power,
-                        AVG(reactive_power_var) AS avg_reactive_power_var,
-                        MAX(reactive_power_var) AS max_reactive_power_var
+                        AVG(watts) AS avg_watts,
+                        MAX(watts) AS max_watts,
+                        AVG(var) AS avg_var,
+                        MAX(var) AS max_var
                     FROM 
                         demo.measurements
                     WHERE 
@@ -109,10 +109,10 @@ app.http('demoDemandProfile', {
                 SELECT 
                     TO_CHAR(hour_utc, 'YYYY-MM-DD HH24') || '-' || TO_CHAR(hour_utc + INTERVAL '1 hour', 'HH24') AS demand_profile_hour_range_utc,
                     TO_CHAR(hour, 'YYYY-MM-DD HH24') || '-' || TO_CHAR(hour + INTERVAL '1 hour', 'HH24') AS demand_profile_hour_range_tz,
-                    avg_total_real_power AS avg_real_power_w,
-                    max_total_real_power AS max_real_power_w,
-                    avg_reactive_power_var,
-                    max_reactive_power_var
+                    avg_watts AS avg_real_power_w,
+                    max_watts AS max_real_power_w,
+                    avg_var,
+                    max_var
                 FROM 
                     hourly_data
                 WHERE 
@@ -145,10 +145,10 @@ app.http('demoDemandProfile', {
                 daily_data AS (
                     SELECT 
                         date_trunc('day', "timestamp_tz") AS day,
-                        AVG(total_real_power) AS avg_total_real_power,
-                        MAX(total_real_power) AS max_total_real_power,
-                        AVG(reactive_power_var) AS avg_reactive_power_var,
-                        MAX(reactive_power_var) AS max_reactive_power_var
+                        AVG(watts) AS avg_watts,
+                        MAX(watts) AS max_watts,
+                        AVG(var) AS avg_var,
+                        MAX(var) AS max_var
                     FROM 
                         demo.measurements
                     WHERE 
@@ -160,10 +160,10 @@ app.http('demoDemandProfile', {
                 )
                 SELECT 
                     TO_CHAR(day, 'YYYY-MM-DD') AS demand_profile_day_range_tz,
-                    avg_total_real_power AS avg_real_power_w,
-                    max_total_real_power AS max_real_power_w,
-                    avg_reactive_power_var,
-                    max_reactive_power_var
+                    avg_watts AS avg_real_power_w,
+                    max_watts AS max_real_power_w,
+                    avg_var,
+                    max_var
                 FROM 
                     daily_data
                 WHERE 
@@ -196,10 +196,10 @@ app.http('demoDemandProfile', {
                 monthly_data AS (
                     SELECT 
                         date_trunc('month', "timestamp_tz") AS month,
-                        AVG(total_real_power) AS avg_total_real_power,
-                        MAX(total_real_power) AS max_total_real_power,
-                        AVG(reactive_power_var) AS avg_reactive_power_var,
-                        MAX(reactive_power_var) AS max_reactive_power_var
+                        AVG(watts) AS avg_watts,
+                        MAX(watts) AS max_watts,
+                        AVG(var) AS avg_var,
+                        MAX(var) AS max_var
                     FROM 
                         demo.measurements
                     WHERE 
@@ -211,10 +211,10 @@ app.http('demoDemandProfile', {
                 )
                 SELECT 
                     TO_CHAR(month, 'YYYY-MM') AS demand_profile_day_range_tz,
-                    avg_total_real_power AS avg_real_power_w,
-                    max_total_real_power AS max_real_power_w,
-                    avg_reactive_power_var,
-                    max_reactive_power_var
+                    avg_watts AS avg_real_power_w,
+                    max_watts AS max_real_power_w,
+                    avg_var,
+                    max_var
                 FROM 
                     monthly_data
                 WHERE 
