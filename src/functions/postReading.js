@@ -78,7 +78,7 @@ app.http('postReading', {
 
         // Build SQL query dynamically
         const columns = Object.keys(data).join(", ");
-        const values = Object.keys(data).map((_, idx) => `$${idx + 1}`).join(", ");
+        const values = Object.keys(data).map((_, idx) => `${idx + 1}`).join(", ");
         const query = `INSERT INTO dev.measurements (${columns}) VALUES (${values});`;
 
         let client;
