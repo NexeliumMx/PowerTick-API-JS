@@ -1,11 +1,11 @@
 /**
  * FileName: src/functions/fetchRealTimeData.js
  * Author(s): Andrés Gómez 
- * Brief: HTTP GET endpoint to fetch the latest measurement entry for a specific powermeter.
+ * Brief: HTTP GET endpoint to fetch the latest measurements for power values entry for a specific powermeter.
  * Date: 2025-04-21
  *
  * Description:
- * This function serves as an HTTP GET endpoint to fetch the latest measurement entry for a specific powermeter.
+ * This function serves as an HTTP GET endpoint to fetch the latest measurement for power values entry for a specific powermeter.
  * It verifies that the user has access to the powermeter and then retrieves the latest measurement entry.
  * The function obtains its query from the file:
  *    PowerTick-backend/postgresql/dataQueries/fetchData/fetchRealTimeData.sql
@@ -21,7 +21,7 @@
  *
  * 3. Schema Setting: The function sets the search path to the desired schema (`demo`).
  *
- * 4. Query Execution: It executes a query to fetch the latest measurement entry for the specified powermeter, 
+ * 4. Query Execution: It executes a query to fetch the latest power measurement entry for the specified powermeter and for power values, 
  *    ensuring that the user has access to the powermeter.
  *
  * 5. Response: The function returns the query results as a JSON response with a status code of 200 

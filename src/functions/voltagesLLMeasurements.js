@@ -5,7 +5,7 @@
  * Date: 2025-04-21
  *
  * Description:
- * This function serves as an HTTP GET endpoint to fetch the latest measurement entry for a specific powermeter.
+ * This function serves as an HTTP GET endpoint to fetch the latest line to line voltage measurement entry for a specific powermeter.
  * It verifies that the user has access to the powermeter and then retrieves the latest measurement entry.
  * The function obtains its query from the file:
  *    PowerTick-backend/postgresql/dataQueries/fetchData/fetchRealTimeData.sql
