@@ -1,5 +1,5 @@
 /**
- * FileName: src/functions/fetchPFLoadCenter.js
+ * FileName: src/functions/fetchDataLoadCenter.js
  * Author(s): Andrés Gómez
  * Brief: HTTP GET endpoint to fetch the power factor and consumption of each energy meter for the load center page.
  * Date: 2025-02-24
@@ -29,9 +29,9 @@
  * Example:
  * Fetch currents measurements for a powermeter:
  * Local:
- *    curl -i -X GET "http://localhost:7071/api/fetchPFLoadCenter?user_id=4c7c56fe-99fc-4611-b57a-0d5683f9bc95&serial_number=DEMO000001"
+ *    curl -i -X GET "http://localhost:7071/api/fetchDataLoadCenter?user_id=4c7c56fe-99fc-4611-b57a-0d5683f9bc95&serial_number=DEMO000001"
  * Production:
- *    curl -i -X GET "https://power-tick-api-js.nexelium.mx/api/fetchPFLoadCenter?user_id=4c7c56fe-99fc-4611-b57a-0d5683f9bc95&serial_number=DEMO000001"
+ *    curl -i -X GET "https://power-tick-api-js.nexelium.mx/api/fetchDataLoadCenter?user_id=4c7c56fe-99fc-4611-b57a-0d5683f9bc95&serial_number=DEMO000001"
  *
  * Expected Response:
  * [...]
@@ -41,7 +41,7 @@
 const { app } = require('@azure/functions');
 const { getClient } = require('./dbClient');
 
-app.http('fetchPFLoadCenter', {
+app.http('fetchDataLoadCenter', {
     methods: ['GET'],
     authLevel: 'anonymous',
     handler: async (request, context) => {
@@ -80,14 +80,24 @@ app.http('fetchPFLoadCenter', {
         AND p.serial_number = $2
 )
 SELECT 
-    AVG(power_factor) AS avg_power_factor
+    AVG(power_factor) AS avg_power_factor,
+    (
+        SELECT 
+            kwh_imported_total
+        FROM 
+            measurements
+        WHERE 
+            serial_number = $2
+        ORDER BY 
+            "timestamp_utc" DESC
+        LIMIT 1
+    ) AS latest_consumption
 FROM 
     measurements
 WHERE 
-    serial_number = 'DEMO000001'
+    serial_number = $2
     AND "timestamp_utc" >= DATE_TRUNC('month', NOW())
     AND "timestamp_utc" < DATE_TRUNC('month', NOW() + INTERVAL '1 month');
-
             `;
 
             const values = [userId, serialNumber];
