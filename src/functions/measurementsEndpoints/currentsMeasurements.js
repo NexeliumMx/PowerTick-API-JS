@@ -1,14 +1,14 @@
 /**
- * FileName: src/functions/fetchPFLoadCenter.js
- * Author(s): Andrés Gómez
- * Brief: HTTP GET endpoint to fetch the power factor and consumption of each energy meter for the load center page.
+ * FileName: src/functions/fetchRealTimeData.js
+ * Author(s): Arturo Vargas
+ * Brief: HTTP GET endpoint to fetch the latest currents measurement entry for a specific powermeter.
  * Date: 2025-02-24
  *
  * Description:
- * This function serves as an HTTP GET endpoint to fetch the the power factor and consumption of each energy meter for the load center page.
+ * This function serves as an HTTP GET endpoint to fetch the latest currents measurement entry for a specific powermeter.
  * It verifies that the user has access to the powermeter and then retrieves the latest measurement entry.
  * The function obtains its query from the file:
- *    PowerTick-backend/postgresql/dataQueries/fetchData/fetchPFLoadCenter.sql
+ *    PowerTick-backend/postgresql/dataQueries/fetchData/fetchRealTimeData.sql
  * 
  * Copyright (c) 2025 BY: Nexelium Technological Solutions S.A. de C.V.
  * All rights reserved.
@@ -21,7 +21,8 @@
  *
  * 3. Schema Setting: The function sets the search path to the desired schema (`demo`).
  *
- * 4. Query Execution: 
+ * 4. Query Execution: It executes a query to fetch the latest measurement entry for the specified powermeter, 
+ *    ensuring that the user has access to the powermeter.
  *
  * 5. Response: The function returns the query results as a JSON response with a status code of 200 
  *    if successful. If there is an error, it returns a status code of 500 with an error message.
@@ -29,19 +30,19 @@
  * Example:
  * Fetch currents measurements for a powermeter:
  * Local:
- *    curl -i -X GET "http://localhost:7071/api/fetchPFLoadCenter?user_id=4c7c56fe-99fc-4611-b57a-0d5683f9bc95&serial_number=DEMO000001"
+ *    curl -i -X GET "http://localhost:7071/api/fetchCurrentsMeasurements?user_id=4c7c56fe-99fc-4611-b57a-0d5683f9bc95&serial_number=DEMO000001"
  * Production:
- *    curl -i -X GET "https://power-tick-api-js.nexelium.mx/api/fetchPFLoadCenter?user_id=4c7c56fe-99fc-4611-b57a-0d5683f9bc95&serial_number=DEMO000001"
+ *    curl -i -X GET "https://power-tick-api-js.nexelium.mx/api/fetchCurrentsMeasurements?user_id=4c7c56fe-99fc-4611-b57a-0d5683f9bc95&serial_number=DEMO000001"
  *
  * Expected Response:
- * [...]
+ * [{"serial_number":"DEMO000001","timestamp_tz":"2025-02-24T16:38:22Z","total_real_power":123.45,"reactive_power_var":67.89}, ...]
  * --------------------------------------------------------------------------- 
 */
 
 const { app } = require('@azure/functions');
-const { getClient } = require('./dbClient');
+const { getClient } = require('../dbClient');
 
-app.http('fetchPFLoadCenter', {
+app.http('fetchCurrentsMeasurements', {
     methods: ['GET'],
     authLevel: 'anonymous',
     handler: async (request, context) => {
@@ -66,30 +67,31 @@ app.http('fetchPFLoadCenter', {
             // Set the search path to the desired schema
             await client.query('SET search_path TO demo');
 
-            // Query to fetch the data needed for the load center page
+            // Query to fetch the latest measurement entry for the specified powermeter
             const query = `
-               WITH user_access AS (
-    SELECT 
-        1
-    FROM 
-        powermeters p
-    JOIN 
-        user_installations ui ON p.installation_id = ui.installation_id
-    WHERE 
-        ui.user_id = $1
-        AND p.serial_number = $2
-)
-SELECT 
-    AVG(power_factor) AS avg_power_factor
-FROM 
-    measurements
-WHERE 
-    serial_number = 'DEMO000001'
-    AND "timestamp_utc" >= DATE_TRUNC('month', NOW())
-    AND "timestamp_utc" < DATE_TRUNC('month', NOW() + INTERVAL '1 month');
-
+                WITH user_access AS (
+                    SELECT 
+                        1
+                    FROM 
+                        powermeters p
+                    JOIN 
+                        user_installations ui ON p.installation_id = ui.installation_id
+                    WHERE 
+                        ui.user_id = $1
+                        AND p.serial_number = $2
+                )
+                SELECT 
+                    current_total, current_l1, current_l2, current_l3
+                FROM 
+                    measurements
+                WHERE 
+                    serial_number = $2
+                    AND "timestamp_utc" < NOW()
+                    AND EXISTS (SELECT 1 FROM user_access)
+                ORDER BY 
+                    "timestamp_utc" DESC
+                LIMIT 1;
             `;
-
             const values = [userId, serialNumber];
             context.log(`Executing query: ${query} with values: ${values}`);
             const res = await client.query(query, values);

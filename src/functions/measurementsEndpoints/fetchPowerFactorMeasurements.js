@@ -38,7 +38,7 @@
 */
 
 const { app } = require('@azure/functions');
-const { getClient } = require('./dbClient');
+const { getClient } = require('../dbClient');
 
 app.http('fetchPowerFactorMeasurements', {
     methods: ['GET'],

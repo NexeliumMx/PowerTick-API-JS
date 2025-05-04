@@ -1,14 +1,14 @@
 /**
- * FileName: src/functions/fetchPowersMeasurements.js
+ * FileName: src/functions/fetchFrequency.js
  * Author(s): Andrés Gómez 
- * Brief: HTTP GET endpoint to fetch the latest measurement entry for a specific powermeter.
+ * Brief: HTTP GET endpoint to fetch the latest frequency measurement entry for a specific powermeter.
  * Date: 2025-04-21
  *
  * Description:
- * This function serves as an HTTP GET endpoint to fetch the latest measurement entry for a specific powermeter.
+ * This function serves as an HTTP GET endpoint to fetch the latest frequency measurement entry for a specific powermeter.
  * It verifies that the user has access to the powermeter and then retrieves the latest measurement entry.
  * The function obtains its query from the file:
- *    PowerTick-backend/postgresql/dataQueries/fetchData/fetchPowersMeasurements.sql
+ *    PowerTick-backend/postgresql/dataQueries/fetchData/fetchFrequency.sql
  * 
  * Copyright (c) 2025 BY: Nexelium Technological Solutions S.A. de C.V.
  * All rights reserved.
@@ -21,7 +21,7 @@
  *
  * 3. Schema Setting: The function sets the search path to the desired schema (`demo`).
  *
- * 4. Query Execution: It executes a query to fetch the latest measurement entry for the specified powermeter, 
+ * 4. Query Execution: It executes a query to fetch the latest measurement entry for frquency for the specified powermeter, 
  *    ensuring that the user has access to the powermeter.
  *
  * 5. Response: The function returns the query results as a JSON response with a status code of 200 
@@ -30,17 +30,17 @@
  * Example:
  * Fetch currents measurements for a powermeter:
  * Local:
- *    curl -i -X GET "http://localhost:7071/api/fetchPowersMeasurements?user_id=4c7c56fe-99fc-4611-b57a-0d5683f9bc95&serial_number=DEMO000001"
+ *    curl -i -X GET "http://localhost:7071/api/fetchFrequency?user_id=4c7c56fe-99fc-4611-b57a-0d5683f9bc95&serial_number=DEMO000001"
  * Production:
- *    curl -i -X GET "https://power-tick-api-js.nexelium.mx/api/fetchPowersMeasurements?user_id=4c7c56fe-99fc-4611-b57a-0d5683f9bc95&serial_number=DEMO000001"
+ *    curl -i -X GET "https://power-tick-api-js.nexelium.mx/api/fetchFrequency?user_id=4c7c56fe-99fc-4611-b57a-0d5683f9bc95&serial_number=DEMO000001"
  *
  * --------------------------------------------------------------------------- 
 */
 
 const { app } = require('@azure/functions');
-const { getClient } = require('./dbClient');
+const { getClient } = require('../dbClient');
 
-app.http('fetchPowersMeasurements', {
+app.http('fetchFrequency', {
     methods: ['GET'],
     authLevel: 'anonymous',
     handler: async (request, context) => {
@@ -79,7 +79,7 @@ app.http('fetchPowersMeasurements', {
                         AND p.serial_number = $2
                 )
                 SELECT 
-                    watts_l1, watts_l2, watts_l3
+                    frequency
                 FROM 
                     measurements
                 WHERE 
