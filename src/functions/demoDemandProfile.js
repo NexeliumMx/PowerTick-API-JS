@@ -107,8 +107,8 @@ app.http('demoDemandProfile', {
                         date_trunc('hour', "timestamp_tz"), date_trunc('hour', "timestamp_utc")
                 )
                 SELECT 
-                    TO_CHAR(hour_utc, 'YYYY-MM-DD HH24') || '-' || TO_CHAR(hour_utc + INTERVAL '1 hour', 'HH24') AS demand_profile_hour_range_utc,
-                    TO_CHAR(hour, 'YYYY-MM-DD HH24') || '-' || TO_CHAR(hour + INTERVAL '1 hour', 'HH24') AS demand_profile_hour_range_tz,
+                    TO_CHAR(hour_utc, 'YYYY-MM-DD HH24:00') || '-' || TO_CHAR(hour_utc + INTERVAL '1 hour', 'HH24:00') AS demand_profile_hour_range_utc,
+                    TO_CHAR(hour, 'YYYY-MM-DD HH24:00') || '-' || TO_CHAR(hour + INTERVAL '1 hour', 'HH24:00') AS demand_profile_hour_range_tz,
                     avg_watts AS avg_real_power_w,
                     max_watts AS max_real_power_w,
                     avg_var,

@@ -127,8 +127,8 @@ app.http('demoConsumptionProfile', {
                         hourly_data
                 )
                 SELECT 
-                    TO_CHAR(hd.hour_utc, 'YYYY-MM-DD HH24') || '-' || TO_CHAR(hd.hour_utc + INTERVAL '1 hour', 'HH24') AS consumption_profile_hour_range_utc,
-                    TO_CHAR(hd.hour, 'YYYY-MM-DD HH24') || '-' || TO_CHAR(hd.hour + INTERVAL '1 hour', 'HH24') AS consumption_profile_hour_range_tz,
+                    TO_CHAR(hd.hour_utc, 'YYYY-MM-DD HH24:00') || '-' || TO_CHAR(hd.hour_utc + INTERVAL '1 hour', 'HH24:00') AS consumption_profile_hour_range_utc,
+                    TO_CHAR(hd.hour, 'YYYY-MM-DD HH24:00') || '-' || TO_CHAR(hd.hour + INTERVAL '1 hour', 'HH24:00') AS consumption_profile_hour_range_tz,
                     hd.kwh_imported_total - phd.prev_real_energy_imported AS real_energy_wh,
                     hd.varh_imported_q1 - phd.prev_var_hours_imported AS reactive_energy_varh
                 FROM 
