@@ -30,9 +30,9 @@
  * Example:
  * Fetch consumption profile data for a powermeter:
  * Local:
- *    curl -i -X GET "http://localhost:7071/api/demoConsumptionProfile?user_id=4c7c56fe-99fc-4611-b57a-0d5683f9bc95&serial_number=DEMO000001&time_interval=day"
- *    curl -i -X GET "http://localhost:7071/api/demoConsumptionProfile?user_id=4c7c56fe-99fc-4611-b57a-0d5683f9bc95&serial_number=DEMO000001&time_interval=month" 
- *    curl -i -X GET "http://localhost:7071/api/demoConsumptionProfile?user_id=4c7c56fe-99fc-4611-b57a-0d5683f9bc95&serial_number=DEMO000001&time_interval=year"
+ *    curl -i -X GET "http://localhost:7071/api/demoConsumptionProfile?user_id=4c7c56fe-99fc-4611-b57a-0d5683f9bc95&serial_number=DEMO000001&time_interval=day&year=2025&month=02&day=25&hour=02"
+ *    curl -i -X GET "http://localhost:7071/api/demoConsumptionProfile?user_id=4c7c56fe-99fc-4611-b57a-0d5683f9bc95&serial_number=DEMO000001&time_interval=month&year=2025&month=02&day=25&hour=02"" 
+ *    curl -i -X GET "http://localhost:7071/api/demoConsumptionProfile?user_id=4c7c56fe-99fc-4611-b57a-0d5683f9bc95&serial_number=DEMO000001&time_interval=year&year=2025&month=02&day=25&hour=02""
  * Production:
  *    curl -i -X GET "https://power-tick-api-js.nexelium.mx/api/demoConsumptionProfile?user_id=4c7c56fe-99fc-4611-b57a-0d5683f9bc95&serial_number=DEMO000001&time_interval=day"
  *    curl -i -X GET "https://power-tick-api-js.nexelium.mx/api/demoConsumptionProfile?user_id=4c7c56fe-99fc-4611-b57a-0d5683f9bc95&serial_number=DEMO000001&time_interval=month"
@@ -55,10 +55,37 @@ app.http('demoConsumptionProfile', {
         const userId = request.query.get('user_id');
         const serialNumber = request.query.get('serial_number');
         const timeInterval = request.query.get('time_interval');
+        const year = request.query.get('year');
+        const month = request.query.get('month');
+        const day = request.query.get('day');
+        const hour = request.query.get('hour');
+let startTimestamp, endTimestamp;
+
+if (timeInterval === 'hour' && year && month && day && hour) {
+    startTimestamp = new Date(`${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}T${hour.padStart(2, '0')}:00:00Z`);
+    endTimestamp = new Date(startTimestamp.getTime() + 60 * 60 * 1000);
+} else if (timeInterval === 'day' && year && month && day) {
+    startTimestamp = new Date(`${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}T00:00:00Z`);
+    endTimestamp = new Date(`${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}T23:59:59Z`);
+} else if (timeInterval === 'month' && year && month) {
+    startTimestamp = new Date(`${year}-${month.padStart(2, '0')}-01T00:00:00Z`);
+    // Get the first day of the next month
+    endTimestamp = new Date(`${year}-${(parseInt(month) + 1).toString().padStart(2, '0')}-01T00:00:00Z`);
+} else if (timeInterval === 'year' && year) {
+    startTimestamp = new Date(`${year}-01-01T00:00:00Z`);
+    endTimestamp = new Date(`${parseInt(year) + 1}-01-01T00:00:00Z`);
+} else {
+    return {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ success: false, message: 'Missing or invalid date parameters' })
+    };
+}
+
         context.log(`Received user_id: ${userId}, serial_number: ${serialNumber}, time_interval: ${timeInterval}`);
 
-        if (!userId || !serialNumber || !timeInterval) {
-            context.log('user_id, serial_number, or time_interval is missing in the request');
+        if (!userId || !serialNumber || !timeInterval|| !startTimestamp|| !endTimestamp) {
+            context.log('user_id, serial_number, time filter, or time_interval is missing in the request');
             return {
                 status: 400,
                 headers: { 'Content-Type': 'application/json' },
@@ -70,213 +97,169 @@ app.http('demoConsumptionProfile', {
         if (timeInterval === 'day') {
             query = `
                 -- Define the user_id and powermeter serial_number
-                WITH user_access AS (
-                    SELECT 
-                        1
-                    FROM 
-                        demo.powermeters p
-                    JOIN 
-                        demo.user_installations ui ON p.installation_id = ui.installation_id
-                    WHERE 
-                        ui.user_id = $1
-                        AND p.serial_number = $2
-                ),
-                powermeter_time_zone AS (
-                    SELECT 
-                        time_zone
-                    FROM 
-                        demo.powermeters
-                    WHERE 
-                        serial_number = $2
-                ),
-                last_entries AS (
-                    SELECT 
-                        "timestamp_tz", 
-                        "timestamp_utc",
-                        kwh_imported_total, 
-                        varh_imported_q1,
-                        date_trunc('hour', "timestamp_tz") AS hour,
-                        date_trunc('hour', "timestamp_utc") AS hour_utc
-                    FROM 
-                        demo.measurements
-                    WHERE 
-                        serial_number = $2
-                        AND "timestamp_tz" < NOW() AT TIME ZONE (SELECT time_zone FROM powermeter_time_zone)
-                        AND EXISTS (SELECT 1 FROM user_access)
-                    ORDER BY 
-                        "timestamp_tz" DESC
-                ),
-                hourly_data AS (
-                    SELECT DISTINCT ON (hour)
-                        hour,
-                        hour_utc,
-                        "timestamp_tz",
-                        kwh_imported_total,
-                        varh_imported_q1
-                    FROM 
-                        last_entries
-                    ORDER BY 
-                        hour, "timestamp_tz" DESC
-                ),
-                previous_hour_data AS (
-                    SELECT 
-                        hour,
-                        LAG(kwh_imported_total) OVER (ORDER BY hour) AS prev_real_energy_imported,
-                        LAG(varh_imported_q1) OVER (ORDER BY hour) AS prev_var_hours_imported
-                    FROM 
-                        hourly_data
-                )
-                SELECT 
-                    TO_CHAR(hd.hour_utc, 'YYYY-MM-DD HH24') || '-' || TO_CHAR(hd.hour_utc + INTERVAL '1 hour', 'HH24') AS consumption_profile_hour_range_utc,
-                    TO_CHAR(hd.hour, 'YYYY-MM-DD HH24') || '-' || TO_CHAR(hd.hour + INTERVAL '1 hour', 'HH24') AS consumption_profile_hour_range_tz,
-                    hd.kwh_imported_total - phd.prev_real_energy_imported AS real_energy_wh,
-                    hd.varh_imported_q1 - phd.prev_var_hours_imported AS reactive_energy_varh
-                FROM 
-                    hourly_data hd
-                JOIN 
-                    previous_hour_data phd ON hd.hour = phd.hour
-                WHERE 
-                    hd.hour >= date_trunc('hour', NOW() AT TIME ZONE (SELECT time_zone FROM powermeter_time_zone)) - INTERVAL '24 hours'
-                ORDER BY 
-                    hd.hour DESC;
+                  WITH user_access AS (
+    SELECT 1
+    FROM demo.powermeters p
+    JOIN demo.user_installations ui ON p.installation_id = ui.installation_id
+    WHERE ui.user_id = $1
+      AND p.serial_number = $2
+),
+powermeter_time_zone AS (
+    SELECT time_zone
+    FROM demo.powermeters
+    WHERE serial_number = $2
+),
+last_entries AS (
+    SELECT 
+        "timestamp_tz", 
+        "timestamp_utc",
+        kwh_imported_total, 
+        varh_imported_q1,
+        date_trunc('hour', "timestamp_tz") AS hour,
+        date_trunc('hour', "timestamp_utc") AS hour_utc
+    FROM demo.measurements
+    WHERE 
+        serial_number = $2
+        AND "timestamp_utc" >= $3 AND "timestamp_utc" < $4
+        AND EXISTS (SELECT 1 FROM user_access)
+    ORDER BY "timestamp_tz" DESC
+),
+hourly_data AS (
+    SELECT DISTINCT ON (hour)
+        hour,
+        hour_utc,
+        "timestamp_tz",
+        kwh_imported_total,
+        varh_imported_q1
+    FROM last_entries
+    ORDER BY hour, "timestamp_tz" DESC
+),
+previous_hour_data AS (
+    SELECT 
+        hour,
+        LAG(kwh_imported_total) OVER (ORDER BY hour) AS prev_real_energy_imported,
+        LAG(varh_imported_q1) OVER (ORDER BY hour) AS prev_var_hours_imported
+    FROM hourly_data
+)
+SELECT 
+    TO_CHAR(hd.hour_utc, 'YYYY-MM-DD HH24') || '-' || TO_CHAR(hd.hour_utc + INTERVAL '1 hour', 'HH24') AS consumption_profile_hour_range_utc,
+    TO_CHAR(hd.hour, 'YYYY-MM-DD HH24') || '-' || TO_CHAR(hd.hour + INTERVAL '1 hour', 'HH24') AS consumption_profile_hour_range_tz,
+    hd.kwh_imported_total - phd.prev_real_energy_imported AS real_energy_wh,
+    hd.varh_imported_q1 - phd.prev_var_hours_imported AS reactive_energy_varh
+FROM hourly_data hd
+JOIN previous_hour_data phd ON hd.hour = phd.hour
+ORDER BY hd.hour DESC;
             `;
         } else if (timeInterval === 'month') {
             query = `
-                -- Define the user_id and powermeter serial_number
-                WITH user_access AS (
-                    SELECT 
-                        1
-                    FROM 
-                        demo.powermeters p
-                    JOIN 
-                        demo.user_installations ui ON p.installation_id = ui.installation_id
-                    WHERE 
-                        ui.user_id = $1
-                        AND p.serial_number = $2
-                ),
-                powermeter_time_zone AS (
-                    SELECT 
-                        time_zone
-                    FROM 
-                        demo.powermeters
-                    WHERE 
-                        serial_number = $2
-                ),
-                last_entries AS (
-                    SELECT 
-                        "timestamp_tz", 
-                        kwh_imported_total, 
-                        varh_imported_q1,
-                        date_trunc('day', "timestamp_tz") AS day
-                    FROM 
-                        demo.measurements
-                    WHERE 
-                        serial_number = $2
-                        AND "timestamp_tz" < NOW() AT TIME ZONE (SELECT time_zone FROM powermeter_time_zone)
-                        AND EXISTS (SELECT 1 FROM user_access)
-                    ORDER BY 
-                        "timestamp_tz" DESC
-                ),
-                daily_data AS (
-                    SELECT DISTINCT ON (day)
-                        day,
-                        "timestamp_tz",
-                        kwh_imported_total,
-                        varh_imported_q1
-                    FROM 
-                        last_entries
-                    ORDER BY 
-                        day, "timestamp_tz" DESC
-                ),
-                previous_day_data AS (
-                    SELECT 
-                        day,
-                        LAG(kwh_imported_total) OVER (ORDER BY day) AS prev_real_energy_imported,
-                        LAG(varh_imported_q1) OVER (ORDER BY day) AS prev_var_hours_imported
-                    FROM 
-                        daily_data
-                )
-                SELECT 
-                    TO_CHAR(dd.day, 'YYYY-MM-DD') AS consumption_profile_day_range_tz,
-                    dd.kwh_imported_total - pdd.prev_real_energy_imported AS real_energy_wh,
-                    dd.varh_imported_q1 - pdd.prev_var_hours_imported AS reactive_energy_varh
-                FROM 
-                    daily_data dd
-                JOIN 
-                    previous_day_data pdd ON dd.day = pdd.day
-                WHERE 
-                    dd.day >= date_trunc('day', NOW() AT TIME ZONE (SELECT time_zone FROM powermeter_time_zone)) - INTERVAL '30 days'
-                ORDER BY 
-                    dd.day DESC;
-            `;
+               -- Define the user_id and powermeter serial_number
+                  WITH user_access AS (
+    SELECT 1
+    FROM demo.powermeters p
+    JOIN demo.user_installations ui ON p.installation_id = ui.installation_id
+    WHERE ui.user_id = $1
+      AND p.serial_number = $2
+),
+powermeter_time_zone AS (
+    SELECT time_zone
+    FROM demo.powermeters
+    WHERE serial_number = $2
+),
+last_entries AS (
+    SELECT 
+        "timestamp_tz", 
+        "timestamp_utc",
+        kwh_imported_total, 
+        varh_imported_q1,
+        date_trunc('hour', "timestamp_tz") AS hour,
+        date_trunc('hour', "timestamp_utc") AS hour_utc
+    FROM demo.measurements
+    WHERE 
+        serial_number = $2
+        AND "timestamp_utc" >= $3 AND "timestamp_utc" < $4
+        AND EXISTS (SELECT 1 FROM user_access)
+    ORDER BY "timestamp_tz" DESC
+),
+hourly_data AS (
+    SELECT DISTINCT ON (hour)
+        hour,
+        hour_utc,
+        "timestamp_tz",
+        kwh_imported_total,
+        varh_imported_q1
+    FROM last_entries
+    ORDER BY hour, "timestamp_tz" DESC
+),
+previous_hour_data AS (
+    SELECT 
+        hour,
+        LAG(kwh_imported_total) OVER (ORDER BY hour) AS prev_real_energy_imported,
+        LAG(varh_imported_q1) OVER (ORDER BY hour) AS prev_var_hours_imported
+    FROM hourly_data
+)
+SELECT 
+    TO_CHAR(hd.hour_utc, 'YYYY-MM-DD HH24') || '-' || TO_CHAR(hd.hour_utc + INTERVAL '1 hour', 'HH24') AS consumption_profile_hour_range_utc,
+    TO_CHAR(hd.hour, 'YYYY-MM-DD HH24') || '-' || TO_CHAR(hd.hour + INTERVAL '1 hour', 'HH24') AS consumption_profile_hour_range_tz,
+    hd.kwh_imported_total - phd.prev_real_energy_imported AS real_energy_wh,
+    hd.varh_imported_q1 - phd.prev_var_hours_imported AS reactive_energy_varh
+FROM hourly_data hd
+JOIN previous_hour_data phd ON hd.hour = phd.hour
+ORDER BY hd.hour DESC;            `;
         } else if (timeInterval === 'year') {
             query = `
-                -- Define the user_id and powermeter serial_number
-                WITH user_access AS (
-                    SELECT 
-                        1
-                    FROM 
-                        demo.powermeters p
-                    JOIN 
-                        demo.user_installations ui ON p.installation_id = ui.installation_id
-                    WHERE 
-                        ui.user_id = $1
-                        AND p.serial_number = $2
-                ),
-                powermeter_time_zone AS (
-                    SELECT 
-                        time_zone
-                    FROM 
-                        demo.powermeters
-                    WHERE 
-                        serial_number = $2
-                ),
-                last_entries AS (
-                    SELECT 
-                        "timestamp_tz", 
-                        kwh_imported_total, 
-                        varh_imported_q1,
-                        date_trunc('month', "timestamp_tz") AS month
-                    FROM 
-                        demo.measurements
-                    WHERE 
-                        serial_number = $2
-                        AND "timestamp_tz" < NOW() AT TIME ZONE (SELECT time_zone FROM powermeter_time_zone)
-                        AND EXISTS (SELECT 1 FROM user_access)
-                    ORDER BY 
-                        "timestamp_tz" DESC
-                ),
-                monthly_data AS (
-                    SELECT DISTINCT ON (month)
-                        month,
-                        "timestamp_tz",
-                        kwh_imported_total,
-                        varh_imported_q1
-                    FROM 
-                        last_entries
-                    ORDER BY 
-                        month, "timestamp_tz" DESC
-                ),
-                previous_month_data AS (
-                    SELECT 
-                        month,
-                        LAG(kwh_imported_total) OVER (ORDER BY month) AS prev_real_energy_imported,
-                        LAG(varh_imported_q1) OVER (ORDER BY month) AS prev_var_hours_imported
-                    FROM 
-                        monthly_data
-                )
-                SELECT 
-                    TO_CHAR(md.month, 'YYYY-MM') AS consumption_profile_month_range_tz,
-                    md.kwh_imported_total - pmd.prev_real_energy_imported AS real_energy_wh,
-                    md.varh_imported_q1 - pmd.prev_var_hours_imported AS reactive_energy_varh
-                FROM 
-                    monthly_data md
-                JOIN 
-                    previous_month_data pmd ON md.month = pmd.month
-                WHERE 
-                    md.month >= date_trunc('month', NOW() AT TIME ZONE (SELECT time_zone FROM powermeter_time_zone)) - INTERVAL '12 months'
-                ORDER BY 
-                    md.month DESC;
+         -- Define the user_id and powermeter serial_number
+                  WITH user_access AS (
+    SELECT 1
+    FROM demo.powermeters p
+    JOIN demo.user_installations ui ON p.installation_id = ui.installation_id
+    WHERE ui.user_id = $1
+      AND p.serial_number = $2
+),
+powermeter_time_zone AS (
+    SELECT time_zone
+    FROM demo.powermeters
+    WHERE serial_number = $2
+),
+last_entries AS (
+    SELECT 
+        "timestamp_tz", 
+        "timestamp_utc",
+        kwh_imported_total, 
+        varh_imported_q1,
+        date_trunc('hour', "timestamp_tz") AS hour,
+        date_trunc('hour', "timestamp_utc") AS hour_utc
+    FROM demo.measurements
+    WHERE 
+        serial_number = $2
+        AND "timestamp_utc" >= $3 AND "timestamp_utc" < $4
+        AND EXISTS (SELECT 1 FROM user_access)
+    ORDER BY "timestamp_tz" DESC
+),
+hourly_data AS (
+    SELECT DISTINCT ON (hour)
+        hour,
+        hour_utc,
+        "timestamp_tz",
+        kwh_imported_total,
+        varh_imported_q1
+    FROM last_entries
+    ORDER BY hour, "timestamp_tz" DESC
+),
+previous_hour_data AS (
+    SELECT 
+        hour,
+        LAG(kwh_imported_total) OVER (ORDER BY hour) AS prev_real_energy_imported,
+        LAG(varh_imported_q1) OVER (ORDER BY hour) AS prev_var_hours_imported
+    FROM hourly_data
+)
+SELECT 
+    TO_CHAR(hd.hour_utc, 'YYYY-MM-DD HH24') || '-' || TO_CHAR(hd.hour_utc + INTERVAL '1 hour', 'HH24') AS consumption_profile_hour_range_utc,
+    TO_CHAR(hd.hour, 'YYYY-MM-DD HH24') || '-' || TO_CHAR(hd.hour + INTERVAL '1 hour', 'HH24') AS consumption_profile_hour_range_tz,
+    hd.kwh_imported_total - phd.prev_real_energy_imported AS real_energy_wh,
+    hd.varh_imported_q1 - phd.prev_var_hours_imported AS reactive_energy_varh
+FROM hourly_data hd
+JOIN previous_hour_data phd ON hd.hour = phd.hour
+ORDER BY hd.hour DESC;
             `;
         } else {
             return {
@@ -289,7 +272,7 @@ app.http('demoConsumptionProfile', {
         try {
             const client = await getClient();  // Reuse the connected client from dbClient.js
 
-            const values = [userId, serialNumber];
+            const values = [userId, serialNumber, startTimestamp.toISOString(), endTimestamp.toISOString()];
             context.log(`Executing query with values: ${values}`);
             const res = await client.query(query, values);
             client.release(); // Release client back to the pool

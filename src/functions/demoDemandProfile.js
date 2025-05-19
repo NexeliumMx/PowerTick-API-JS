@@ -30,9 +30,9 @@
  * Example:
  * Fetch demand profile data for a powermeter:
  * Local:
- *    curl -i -X GET "http://localhost:7071/api/demoDemandProfile?user_id=4c7c56fe-99fc-4611-b57a-0d5683f9bc95&serial_number=DEMO000001&time_interval=day"
- *    curl -i -X GET "http://localhost:7071/api/demoDemandProfile?user_id=4c7c56fe-99fc-4611-b57a-0d5683f9bc95&serial_number=DEMO000001&time_interval=month" 
- *    curl -i -X GET "http://localhost:7071/api/demoDemandProfile?user_id=4c7c56fe-99fc-4611-b57a-0d5683f9bc95&serial_number=DEMO000001&time_interval=year"
+ *    curl -i -X GET "http://localhost:7071/api/demoDemandProfile?user_id=4c7c56fe-99fc-4611-b57a-0d5683f9bc95&serial_number=DEMO000001&time_interval=day&year=2025&month=02&day=25"
+ *    curl -i -X GET "http://localhost:7071/api/demoDemandProfile?user_id=4c7c56fe-99fc-4611-b57a-0d5683f9bc95&serial_number=DEMO000001&time_interval=month&year=2025&month=02"
+ *    curl -i -X GET "http://localhost:7071/api/demoDemandProfile?user_id=4c7c56fe-99fc-4611-b57a-0d5683f9bc95&serial_number=DEMO000001&time_interval=year&year=2025"
  * Production:
  *    curl -i -X GET "https://power-tick-api-js.nexelium.mx/api/demoDemandProfile?user_id=4c7c56fe-99fc-4611-b57a-0d5683f9bc95&serial_number=DEMO000001&time_interval=day"
  *    curl -i -X GET "https://power-tick-api-js.nexelium.mx/api/demoDemandProfile?user_id=4c7c56fe-99fc-4611-b57a-0d5683f9bc95&serial_number=DEMO000001&time_interval=month"
@@ -55,10 +55,37 @@ app.http('demoDemandProfile', {
         const userId = request.query.get('user_id');
         const serialNumber = request.query.get('serial_number');
         const timeInterval = request.query.get('time_interval');
+        const year = request.query.get('year');
+        const month = request.query.get('month');
+        const day = request.query.get('day');
+        const hour = request.query.get('hour');
+let startTimestamp, endTimestamp;
+
+if (timeInterval === 'hour' && year && month && day && hour) {
+    startTimestamp = new Date(`${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}T${hour.padStart(2, '0')}:00:00Z`);
+    endTimestamp = new Date(startTimestamp.getTime() + 60 * 60 * 1000);
+} else if (timeInterval === 'day' && year && month && day) {
+    startTimestamp = new Date(`${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}T00:00:00Z`);
+    endTimestamp = new Date(`${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}T23:59:59Z`);
+} else if (timeInterval === 'month' && year && month) {
+    startTimestamp = new Date(`${year}-${month.padStart(2, '0')}-01T00:00:00Z`);
+    // Get the first day of the next month
+    endTimestamp = new Date(`${year}-${(parseInt(month) + 1).toString().padStart(2, '0')}-01T00:00:00Z`);
+} else if (timeInterval === 'year' && year) {
+    startTimestamp = new Date(`${year}-01-01T00:00:00Z`);
+    endTimestamp = new Date(`${parseInt(year) + 1}-01-01T00:00:00Z`);
+} else {
+    return {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ success: false, message: 'Missing or invalid date parameters' })
+    };
+}
+
         context.log(`Received user_id: ${userId}, serial_number: ${serialNumber}, time_interval: ${timeInterval}`);
 
-        if (!userId || !serialNumber || !timeInterval) {
-            context.log('user_id, serial_number, or time_interval is missing in the request');
+        if (!userId || !serialNumber || !timeInterval|| !startTimestamp|| !endTimestamp) {
+            context.log('user_id, serial_number, time filter, or time_interval is missing in the request');
             return {
                 status: 400,
                 headers: { 'Content-Type': 'application/json' },
@@ -68,161 +95,123 @@ app.http('demoDemandProfile', {
 
         let query;
         if (timeInterval === 'day') {
-            query = `
-                -- Define the user_id and powermeter serial_number
-                WITH user_access AS (
-                    SELECT 
-                        1
-                    FROM 
-                        demo.powermeters p
-                    JOIN 
-                        demo.user_installations ui ON p.installation_id = ui.installation_id
-                    WHERE 
-                        ui.user_id = $1
-                        AND p.serial_number = $2
-                ),
-                powermeter_time_zone AS (
-                    SELECT 
-                        time_zone
-                    FROM 
-                        demo.powermeters
-                    WHERE 
-                        serial_number = $2
-                ),
-                hourly_data AS (
-                    SELECT 
-                        date_trunc('hour', "timestamp_tz") AS hour,
-                        date_trunc('hour', "timestamp_utc") AS hour_utc,
-                        AVG(watts) AS avg_watts,
-                        MAX(watts) AS max_watts,
-                        AVG(var) AS avg_var,
-                        MAX(var) AS max_var
-                    FROM 
-                        demo.measurements
-                    WHERE 
-                        serial_number = $2
-                        AND "timestamp_tz" < NOW() AT TIME ZONE (SELECT time_zone FROM powermeter_time_zone)
-                        AND EXISTS (SELECT 1 FROM user_access)
-                    GROUP BY 
-                        date_trunc('hour', "timestamp_tz"), date_trunc('hour', "timestamp_utc")
-                )
-                SELECT 
-                    TO_CHAR(hour_utc, 'YYYY-MM-DD HH24') || '-' || TO_CHAR(hour_utc + INTERVAL '1 hour', 'HH24') AS demand_profile_hour_range_utc,
-                    TO_CHAR(hour, 'YYYY-MM-DD HH24') || '-' || TO_CHAR(hour + INTERVAL '1 hour', 'HH24') AS demand_profile_hour_range_tz,
-                    avg_watts AS avg_real_power_w,
-                    max_watts AS max_real_power_w,
-                    avg_var,
-                    max_var
-                FROM 
-                    hourly_data
-                WHERE 
-                    hour >= date_trunc('hour', NOW() AT TIME ZONE (SELECT time_zone FROM powermeter_time_zone)) - INTERVAL '24 hours'
-                ORDER BY 
-                    hour DESC;
-            `;
-        } else if (timeInterval === 'month') {
-            query = `
-                -- Define the user_id and powermeter serial_number
-                WITH user_access AS (
-                    SELECT 
-                        1
-                    FROM 
-                        demo.powermeters p
-                    JOIN 
-                        demo.user_installations ui ON p.installation_id = ui.installation_id
-                    WHERE 
-                        ui.user_id = $1
-                        AND p.serial_number = $2
-                ),
-                powermeter_time_zone AS (
-                    SELECT 
-                        time_zone
-                    FROM 
-                        demo.powermeters
-                    WHERE 
-                        serial_number = $2
-                ),
-                daily_data AS (
-                    SELECT 
-                        date_trunc('day', "timestamp_tz") AS day,
-                        AVG(watts) AS avg_watts,
-                        MAX(watts) AS max_watts,
-                        AVG(var) AS avg_var,
-                        MAX(var) AS max_var
-                    FROM 
-                        demo.measurements
-                    WHERE 
-                        serial_number = $2
-                        AND "timestamp_tz" < NOW() AT TIME ZONE (SELECT time_zone FROM powermeter_time_zone)
-                        AND EXISTS (SELECT 1 FROM user_access)
-                    GROUP BY 
-                        date_trunc('day', "timestamp_tz")
-                )
-                SELECT 
-                    TO_CHAR(day, 'YYYY-MM-DD') AS demand_profile_day_range_tz,
-                    avg_watts AS avg_real_power_w,
-                    max_watts AS max_real_power_w,
-                    avg_var,
-                    max_var
-                FROM 
-                    daily_data
-                WHERE 
-                    day >= date_trunc('day', NOW() AT TIME ZONE (SELECT time_zone FROM powermeter_time_zone)) - INTERVAL '30 days'
-                ORDER BY 
-                    day DESC;
-            `;
-        } else if (timeInterval === 'year') {
-            query = `
-                -- Define the user_id and powermeter serial_number
-                WITH user_access AS (
-                    SELECT 
-                        1
-                    FROM 
-                        demo.powermeters p
-                    JOIN 
-                        demo.user_installations ui ON p.installation_id = ui.installation_id
-                    WHERE 
-                        ui.user_id = $1
-                        AND p.serial_number = $2
-                ),
-                powermeter_time_zone AS (
-                    SELECT 
-                        time_zone
-                    FROM 
-                        demo.powermeters
-                    WHERE 
-                        serial_number = $2
-                ),
-                monthly_data AS (
-                    SELECT 
-                        date_trunc('month', "timestamp_tz") AS month,
-                        AVG(watts) AS avg_watts,
-                        MAX(watts) AS max_watts,
-                        AVG(var) AS avg_var,
-                        MAX(var) AS max_var
-                    FROM 
-                        demo.measurements
-                    WHERE 
-                        serial_number = $2
-                        AND "timestamp_tz" < NOW() AT TIME ZONE (SELECT time_zone FROM powermeter_time_zone)
-                        AND EXISTS (SELECT 1 FROM user_access)
-                    GROUP BY 
-                        date_trunc('month', "timestamp_tz")
-                )
-                SELECT 
-                    TO_CHAR(month, 'YYYY-MM') AS demand_profile_day_range_tz,
-                    avg_watts AS avg_real_power_w,
-                    max_watts AS max_real_power_w,
-                    avg_var,
-                    max_var
-                FROM 
-                    monthly_data
-                WHERE 
-                    month >= date_trunc('month', NOW() AT TIME ZONE (SELECT time_zone FROM powermeter_time_zone)) - INTERVAL '12 months'
-                ORDER BY 
-                    month DESC;
-            `;
-        } else {
+    query = `
+        WITH user_access AS (
+            SELECT 1
+            FROM demo.powermeters p
+            JOIN demo.user_installations ui ON p.installation_id = ui.installation_id
+            WHERE ui.user_id = $1
+              AND p.serial_number = $2
+        ),
+        powermeter_time_zone AS (
+            SELECT time_zone
+            FROM demo.powermeters
+            WHERE serial_number = $2
+        ),
+        hourly_data AS (
+            SELECT 
+                date_trunc('hour', "timestamp_tz") AS hour,
+                date_trunc('hour', "timestamp_utc") AS hour_utc,
+                AVG(watts) AS avg_watts,
+                MAX(watts) AS max_watts,
+                AVG(var) AS avg_var,
+                MAX(var) AS max_var
+            FROM demo.measurements
+            WHERE 
+                serial_number = $2
+                AND "timestamp_utc" >= $3 AND "timestamp_utc" < $4
+                AND EXISTS (SELECT 1 FROM user_access)
+            GROUP BY 
+                date_trunc('hour', "timestamp_tz"), date_trunc('hour', "timestamp_utc")
+        )
+        SELECT 
+            TO_CHAR(hour_utc, 'YYYY-MM-DD HH24') || '-' || TO_CHAR(hour_utc + INTERVAL '1 hour', 'HH24') AS demand_profile_hour_range_utc,
+            TO_CHAR(hour, 'YYYY-MM-DD HH24') || '-' || TO_CHAR(hour + INTERVAL '1 hour', 'HH24') AS demand_profile_hour_range_tz,
+            avg_watts AS avg_real_power_w,
+            max_watts AS max_real_power_w,
+            avg_var,
+            max_var
+        FROM hourly_data
+        ORDER BY hour DESC;
+    `;
+}
+         else if (timeInterval === 'month') {
+    query = `
+        WITH user_access AS (
+            SELECT 1
+            FROM demo.powermeters p
+            JOIN demo.user_installations ui ON p.installation_id = ui.installation_id
+            WHERE ui.user_id = $1
+              AND p.serial_number = $2
+        ),
+        powermeter_time_zone AS (
+            SELECT time_zone
+            FROM demo.powermeters
+            WHERE serial_number = $2
+        ),
+        daily_data AS (
+            SELECT 
+                date_trunc('day', "timestamp_tz") AS day,
+                AVG(watts) AS avg_watts,
+                MAX(watts) AS max_watts,
+                AVG(var) AS avg_var,
+                MAX(var) AS max_var
+            FROM demo.measurements
+            WHERE 
+                serial_number = $2
+                AND "timestamp_utc" >= $3 AND "timestamp_utc" < $4
+                AND EXISTS (SELECT 1 FROM user_access)
+            GROUP BY 
+                date_trunc('day', "timestamp_tz")
+        )
+        SELECT 
+            TO_CHAR(day, 'YYYY-MM-DD') AS demand_profile_day_range_tz,
+            avg_watts AS avg_real_power_w,
+            max_watts AS max_real_power_w,
+            avg_var,
+            max_var
+        FROM daily_data
+        ORDER BY day DESC;
+    `;
+}        else if (timeInterval === 'year') {
+    query = `
+        WITH user_access AS (
+            SELECT 1
+            FROM demo.powermeters p
+            JOIN demo.user_installations ui ON p.installation_id = ui.installation_id
+            WHERE ui.user_id = $1
+              AND p.serial_number = $2
+        ),
+        powermeter_time_zone AS (
+            SELECT time_zone
+            FROM demo.powermeters
+            WHERE serial_number = $2
+        ),
+        monthly_data AS (
+            SELECT 
+                date_trunc('month', "timestamp_tz") AS month,
+                AVG(watts) AS avg_watts,
+                MAX(watts) AS max_watts,
+                AVG(var) AS avg_var,
+                MAX(var) AS max_var
+            FROM demo.measurements
+            WHERE 
+                serial_number = $2
+                AND "timestamp_utc" >= $3 AND "timestamp_utc" < $4
+                AND EXISTS (SELECT 1 FROM user_access)
+            GROUP BY 
+                date_trunc('month', "timestamp_tz")
+        )
+        SELECT 
+            TO_CHAR(month, 'YYYY-MM') AS demand_profile_month_range_tz,
+            avg_watts AS avg_real_power_w,
+            max_watts AS max_real_power_w,
+            avg_var,
+            max_var
+        FROM monthly_data
+        ORDER BY month DESC;
+    `;
+} else {
             return {
                 status: 400,
                 headers: { 'Content-Type': 'application/json' },
@@ -233,7 +222,7 @@ app.http('demoDemandProfile', {
         try {
             const client = await getClient();  // Reuse the connected client from dbClient.js
 
-            const values = [userId, serialNumber];
+            const values = [userId, serialNumber, startTimestamp.toISOString(), endTimestamp.toISOString()];
             context.log(`Executing query with values: ${values}`);
             const res = await client.query(query, values);
             client.release(); // Release client back to the pool

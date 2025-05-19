@@ -28,8 +28,8 @@
  * Example:
  * Fetch consumption history data for a powermeter:
  * Local:
- *    curl -i -X GET "http://localhost:7071/api/demoConsumptionHistory?user_id=4c7c56fe-99fc-4611-b57a-0d5683f9bc95&serial_number=DEMO000001&time_interval=hour"
- *    curl -i -X GET "http://localhost:7071/api/demoConsumptionHistory?user_id=4c7c56fe-99fc-4611-b57a-0d5683f9bc95&serial_number=DEMO000001&time_interval=day"
+ *    curl -i -X GET "http://localhost:7071/api/demoConsumptionHistory?user_id=4c7c56fe-99fc-4611-b57a-0d5683f9bc95&serial_number=DEMO000001&time_interval=hour&year=2025&month=02&day=25&hour=02"
+ *    curl -i -X GET "http://localhost:7071/api/demoConsumptionHistory?user_id=4c7c56fe-99fc-4611-b57a-0d5683f9bc95&serial_number=DEMO000001&time_interval=day&year=2025&month=02&day=25&hour=02"
  * Production:
  *    curl -i -X GET "https://power-tick-api-js.nexelium.mx/api/demoConsumptionHistory?user_id=4c7c56fe-99fc-4611-b57a-0d5683f9bc95&serial_number=DEMO000001&time_interval=hour"
  *    curl -i -X GET "https://power-tick-api-js.nexelium.mx/api/demoConsumptionHistory?user_id=4c7c56fe-99fc-4611-b57a-0d5683f9bc95&serial_number=DEMO000001&time_interval=day"
@@ -51,11 +51,31 @@ app.http('demoConsumptionHistory', {
         const userId = request.query.get('user_id');
         const serialNumber = request.query.get('serial_number');
         const timeInterval = request.query.get('time_interval');
+        const year = request.query.get('year');
+        const month = request.query.get('month');
+        const day = request.query.get('day');
+        const hour = request.query.get('hour');
+        if (timeInterval === 'hour' && year && month && day && hour) {
+    startTimestamp = new Date(`${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}T${hour.padStart(2, '0')}:00:00Z`);
+    endTimestamp = new Date(startTimestamp.getTime() + 60 * 60 * 1000); // +1 hour
+} else if (timeInterval === 'day' && year && month && day) {
+    startTimestamp = new Date(`${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}T00:00:00Z`);
+    endTimestamp = new Date(`${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}T23:59:59Z`);
+} else if (timeInterval === 'year' && year) {
+    startTimestamp = new Date(`${year}-01-01T00:00:00Z`);
+    endTimestamp = new Date(`${year}-12-31T23:59:59Z`);
+} else {
+        return {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ success: false, message: 'Missing or invalid date parameters' })
+    };
+}
         context.log(`Received user_id: ${userId}, serial_number: ${serialNumber}, time_interval: ${timeInterval}`);
 
-        if (!userId || !serialNumber || !timeInterval) {
-            context.log('user_id, serial_number, or time_interval is missing in the request');
-            return {
+    if (!userId || !serialNumber || !timeInterval|| !startTimestamp|| !endTimestamp) {
+            context.log('user_id, serial_number, time filter, or time_interval is missing in the request');
+         return {
                 status: 400,
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ success: false, message: 'user_id, serial_number, and time_interval are required' })
@@ -94,8 +114,8 @@ app.http('demoConsumptionHistory', {
                     demo.measurements
                 WHERE 
                     serial_number = $2
-                    AND "timestamp_tz" < NOW() AT TIME ZONE (SELECT time_zone FROM powermeter_time_zone)
-                    AND "timestamp_utc" > NOW() - INTERVAL '1 hour'
+                    AND "timestamp_tz" < $4 AT TIME ZONE (SELECT time_zone FROM powermeter_time_zone)
+                    AND "timestamp_utc" > $3
                     AND EXISTS (SELECT 1 FROM user_access)
                 ORDER BY 
                     "timestamp_utc" DESC;
@@ -131,8 +151,8 @@ app.http('demoConsumptionHistory', {
                     demo.measurements
                 WHERE 
                     serial_number = $2
-                    AND "timestamp_tz" < NOW() AT TIME ZONE (SELECT time_zone FROM powermeter_time_zone)
-                    AND "timestamp_utc" > NOW() - INTERVAL '24 hours'
+                    AND "timestamp_tz" < $4 AT TIME ZONE (SELECT time_zone FROM powermeter_time_zone)
+                    AND "timestamp_utc" > $3
                     AND EXISTS (SELECT 1 FROM user_access)
                 ORDER BY 
                     "timestamp_utc" DESC;
@@ -148,7 +168,7 @@ app.http('demoConsumptionHistory', {
         try {
             const client = await getClient();  // Reuse the connected client from dbClient.js
 
-            const values = [userId, serialNumber];
+            const values = [userId, serialNumber, startTimestamp.toISOString(), endTimestamp.toISOString()];
             context.log(`Executing query with values: ${values}`);
             const res = await client.query(query, values);
             client.release(); // Release client back to the pool
