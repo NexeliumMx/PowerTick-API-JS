@@ -118,7 +118,7 @@ app.http('demoDemandProfile', {
                 WHERE 
                     hour >= date_trunc('hour', NOW() AT TIME ZONE (SELECT time_zone FROM powermeter_time_zone)) - INTERVAL '24 hours'
                 ORDER BY 
-                    hour DESC;
+                    hour ASC;
             `;
         } else if (timeInterval === 'month') {
             query = `
@@ -169,7 +169,7 @@ app.http('demoDemandProfile', {
                 WHERE 
                     day >= date_trunc('day', NOW() AT TIME ZONE (SELECT time_zone FROM powermeter_time_zone)) - INTERVAL '30 days'
                 ORDER BY 
-                    day DESC;
+                    day ASC;
             `;
         } else if (timeInterval === 'year') {
             query = `
@@ -220,7 +220,7 @@ app.http('demoDemandProfile', {
                 WHERE 
                     month >= date_trunc('month', NOW() AT TIME ZONE (SELECT time_zone FROM powermeter_time_zone)) - INTERVAL '12 months'
                 ORDER BY 
-                    month DESC;
+                    month ASC;
             `;
         } else {
             return {

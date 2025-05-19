@@ -138,7 +138,7 @@ app.http('demoConsumptionProfile', {
                 WHERE 
                     hd.hour >= date_trunc('hour', NOW() AT TIME ZONE (SELECT time_zone FROM powermeter_time_zone)) - INTERVAL '24 hours'
                 ORDER BY 
-                    hd.hour DESC;
+                    hd.hour ASC;
             `;
         } else if (timeInterval === 'month') {
             query = `
@@ -207,7 +207,7 @@ app.http('demoConsumptionProfile', {
                 WHERE 
                     dd.day >= date_trunc('day', NOW() AT TIME ZONE (SELECT time_zone FROM powermeter_time_zone)) - INTERVAL '30 days'
                 ORDER BY 
-                    dd.day DESC;
+                    dd.day ASC;
             `;
         } else if (timeInterval === 'year') {
             query = `
@@ -276,7 +276,7 @@ app.http('demoConsumptionProfile', {
                 WHERE 
                     md.month >= date_trunc('month', NOW() AT TIME ZONE (SELECT time_zone FROM powermeter_time_zone)) - INTERVAL '12 months'
                 ORDER BY 
-                    md.month DESC;
+                    md.month ASC;
             `;
         } else {
             return {
