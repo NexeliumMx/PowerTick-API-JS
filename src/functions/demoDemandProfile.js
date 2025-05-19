@@ -210,7 +210,7 @@ app.http('demoDemandProfile', {
                         date_trunc('month', "timestamp_tz")
                 )
                 SELECT 
-                    TO_CHAR(month, 'YYYY-MM') AS demand_profile_day_range_tz,
+                    TO_CHAR(month, 'YYYY-MM') AS demand_profile_month_range_tz,
                     avg_watts AS avg_real_power_w,
                     max_watts AS max_real_power_w,
                     avg_var,
