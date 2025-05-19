@@ -98,7 +98,7 @@ app.http('demoConsumptionHistory', {
                     AND "timestamp_utc" > NOW() - INTERVAL '1 hour'
                     AND EXISTS (SELECT 1 FROM user_access)
                 ORDER BY 
-                    "timestamp_utc" DESC;
+                    "timestamp_utc" ASC;
             `;
         } else if (timeInterval === 'day') {
             query = `
@@ -135,7 +135,7 @@ app.http('demoConsumptionHistory', {
                     AND "timestamp_utc" > NOW() - INTERVAL '24 hours'
                     AND EXISTS (SELECT 1 FROM user_access)
                 ORDER BY 
-                    "timestamp_utc" DESC;
+                    "timestamp_utc" ASC;
             `;
         } else {
             return {
