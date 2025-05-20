@@ -1,14 +1,14 @@
 /**
- * FileName: src/functions/fetchVoltagesLL.js
+ * FileName: src/functions/fetchPowersMeasurements.js
  * Author(s): Andrés Gómez 
  * Brief: HTTP GET endpoint to fetch the latest measurement entry for a specific powermeter.
  * Date: 2025-04-21
  *
  * Description:
- * This function serves as an HTTP GET endpoint to fetch the latest line to line voltage measurement entry for a specific powermeter.
+ * This function serves as an HTTP GET endpoint to fetch the latest measurement entry for a specific powermeter.
  * It verifies that the user has access to the powermeter and then retrieves the latest measurement entry.
  * The function obtains its query from the file:
- *    PowerTick-backend/postgresql/dataQueries/fetchData/fetchVoltagesLL.sql
+ *    PowerTick-backend/postgresql/dataQueries/fetchData/fetchPowersMeasurements.sql
  * 
  * Copyright (c) 2025 BY: Nexelium Technological Solutions S.A. de C.V.
  * All rights reserved.
@@ -30,17 +30,17 @@
  * Example:
  * Fetch currents measurements for a powermeter:
  * Local:
- *    curl -i -X GET "http://localhost:7071/api/fetchVoltagesLL?user_id=4c7c56fe-99fc-4611-b57a-0d5683f9bc95&serial_number=DEMO000001"
+ *    curl -i -X GET "http://localhost:7071/api/fetchPowersMeasurements?user_id=4c7c56fe-99fc-4611-b57a-0d5683f9bc95&serial_number=DEMO000001"
  * Production:
- *    curl -i -X GET "https://power-tick-api-js.nexelium.mx/api/fetchVoltagesLL?user_id=4c7c56fe-99fc-4611-b57a-0d5683f9bc95&serial_number=DEMO000001"
+ *    curl -i -X GET "https://power-tick-api-js.nexelium.mx/api/fetchPowersMeasurements?user_id=4c7c56fe-99fc-4611-b57a-0d5683f9bc95&serial_number=DEMO000001"
  *
  * --------------------------------------------------------------------------- 
 */
 
 const { app } = require('@azure/functions');
-const { getClient } = require('./dbClient');
+const { getClient } = require('../dbClient');
 
-app.http('fetchVoltagesLL', {
+app.http('fetchPowersMeasurements', {
     methods: ['GET'],
     authLevel: 'anonymous',
     handler: async (request, context) => {
@@ -79,7 +79,7 @@ app.http('fetchVoltagesLL', {
                         AND p.serial_number = $2
                 )
                 SELECT 
-                    voltage_ll, voltage_l1_l2, voltage_l2_l3, voltage_l3_l1
+                    watts_l1, watts_l2, watts_l3
                 FROM 
                     measurements
                 WHERE 

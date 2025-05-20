@@ -71,6 +71,7 @@ app.http('fetchPowermetersByUserAccess', {
             const query = `
                 SELECT 
                     p.serial_number, 
+                    p.powermeter_alias,
                     p.client_id, 
                     c.client_alias, 
                     p.installation_id, 

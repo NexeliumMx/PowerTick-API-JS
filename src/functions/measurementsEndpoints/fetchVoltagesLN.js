@@ -1,14 +1,14 @@
 /**
- * FileName: src/functions/fetchRealTimeData.js
- * Author(s): Arturo Vargas
- * Brief: HTTP GET endpoint to fetch the latest currents measurement entry for a specific powermeter.
+ * FileName: src/functions/fetchVoltagesLN.js
+ * Author(s): 
+ * Brief: HTTP GET endpoint to fetch the latest measurement entry for a specific powermeter.
  * Date: 2025-02-24
  *
  * Description:
- * This function serves as an HTTP GET endpoint to fetch the latest currents measurement entry for a specific powermeter.
+ * This function serves as an HTTP GET endpoint to fetch the latest line to neutral voltage measurement entry for a specific powermeter.
  * It verifies that the user has access to the powermeter and then retrieves the latest measurement entry.
  * The function obtains its query from the file:
- *    PowerTick-backend/postgresql/dataQueries/fetchData/fetchRealTimeData.sql
+ *    PowerTick-backend/postgresql/dataQueries/fetchData/fetchVoltagesLN.sql
  * 
  * Copyright (c) 2025 BY: Nexelium Technological Solutions S.A. de C.V.
  * All rights reserved.
@@ -30,9 +30,9 @@
  * Example:
  * Fetch currents measurements for a powermeter:
  * Local:
- *    curl -i -X GET "http://localhost:7071/api/fetchCurrentsMeasurements?user_id=4c7c56fe-99fc-4611-b57a-0d5683f9bc95&serial_number=DEMO000001"
+ *    curl -i -X GET "http://localhost:7071/api/fetchVoltagesLN?user_id=4c7c56fe-99fc-4611-b57a-0d5683f9bc95&serial_number=DEMO000001"
  * Production:
- *    curl -i -X GET "https://power-tick-api-js.nexelium.mx/api/fetchCurrentsMeasurements?user_id=4c7c56fe-99fc-4611-b57a-0d5683f9bc95&serial_number=DEMO000001"
+ *    curl -i -X GET "https://power-tick-api-js.nexelium.mx/api/fetchVoltagesLN?user_id=4c7c56fe-99fc-4611-b57a-0d5683f9bc95&serial_number=DEMO000001"
  *
  * Expected Response:
  * [{"serial_number":"DEMO000001","timestamp_tz":"2025-02-24T16:38:22Z","total_real_power":123.45,"reactive_power_var":67.89}, ...]
@@ -40,9 +40,9 @@
 */
 
 const { app } = require('@azure/functions');
-const { getClient } = require('./dbClient');
+const { getClient } = require('../dbClient');
 
-app.http('fetchCurrentsMeasurements', {
+app.http('fetchVoltagesLN', {
     methods: ['GET'],
     authLevel: 'anonymous',
     handler: async (request, context) => {
@@ -81,7 +81,7 @@ app.http('fetchCurrentsMeasurements', {
                         AND p.serial_number = $2
                 )
                 SELECT 
-                    current_total, current_l1, current_l2, current_l3
+                    voltage_ln, voltage_l1, voltage_l2, voltage_l3
                 FROM 
                     measurements
                 WHERE 

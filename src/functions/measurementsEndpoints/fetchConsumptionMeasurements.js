@@ -1,14 +1,14 @@
 /**
- * FileName: src/functions/fetchDataLoadCenter.js
- * Author(s): Andrés Gómez
- * Brief: HTTP GET endpoint to fetch the power factor and consumption of each energy meter for the load center page.
- * Date: 2025-02-24
+ * FileName: src/functions/fetchConsumptionMeasurements.js
+ * Author(s): Andrés Gómez 
+ * Brief: HTTP GET endpoint to fetch the latest energy consumption measurement entry for a specific powermeter.
+ * Date: 2025-04-21
  *
  * Description:
- * This function serves as an HTTP GET endpoint to fetch the the power factor and consumption of each energy meter for the load center page.
+ * This function serves as an HTTP GET endpoint to fetch the latest energy consumption measurement entry for a specific powermeter.
  * It verifies that the user has access to the powermeter and then retrieves the latest measurement entry.
  * The function obtains its query from the file:
- *    PowerTick-backend/postgresql/dataQueries/fetchData/fetchPFLoadCenter.sql
+ *    PowerTick-backend/postgresql/dataQueries/fetchData/fetchConsumptionMeasurements.sql
  * 
  * Copyright (c) 2025 BY: Nexelium Technological Solutions S.A. de C.V.
  * All rights reserved.
@@ -21,7 +21,8 @@
  *
  * 3. Schema Setting: The function sets the search path to the desired schema (`demo`).
  *
- * 4. Query Execution: 
+ * 4. Query Execution: It executes a query to fetch the latest energy consumption measurement entry for the specified powermeter, 
+ *    ensuring that the user has access to the powermeter.
  *
  * 5. Response: The function returns the query results as a JSON response with a status code of 200 
  *    if successful. If there is an error, it returns a status code of 500 with an error message.
@@ -29,19 +30,17 @@
  * Example:
  * Fetch currents measurements for a powermeter:
  * Local:
- *    curl -i -X GET "http://localhost:7071/api/fetchDataLoadCenter?user_id=4c7c56fe-99fc-4611-b57a-0d5683f9bc95&serial_number=DEMO000001"
+ *    curl -i -X GET "http://localhost:7071/api/fetchConsumptionMeasurements?user_id=4c7c56fe-99fc-4611-b57a-0d5683f9bc95&serial_number=DEMO000001"
  * Production:
- *    curl -i -X GET "https://power-tick-api-js.nexelium.mx/api/fetchDataLoadCenter?user_id=4c7c56fe-99fc-4611-b57a-0d5683f9bc95&serial_number=DEMO000001"
+ *    curl -i -X GET "https://power-tick-api-js.nexelium.mx/api/fetchConsumptionMeasurements?user_id=4c7c56fe-99fc-4611-b57a-0d5683f9bc95&serial_number=DEMO000001"
  *
- * Expected Response:
- * [...]
  * --------------------------------------------------------------------------- 
 */
 
 const { app } = require('@azure/functions');
 const { getClient } = require('../dbClient');
 
-app.http('fetchDataLoadCenter', {
+app.http('fetchConsumptionMeasurements', {
     methods: ['GET'],
     authLevel: 'anonymous',
     handler: async (request, context) => {
@@ -64,35 +63,33 @@ app.http('fetchDataLoadCenter', {
             const client = await getClient();  // Reuse the connected client from dbClient.js
 
             // Set the search path to the desired schema
-            await client.query('SET search_path TO demo2');
+            await client.query('SET search_path TO demo');
 
-            // Query to fetch the data needed for the load center page
+            // Query to fetch the latest measurement entry for the specified powermeter
             const query = `
-    WITH user_access AS (
-    SELECT 1
-    FROM powermeters p
-    JOIN user_installations ui ON p.installation_id = ui.installation_id
-    WHERE ui.user_id = $1
-    AND p.serial_number = $2
-)
-SELECT DISTINCT ON (p.serial_number)
-    AVG(m.power_factor) OVER () AS avg_power_factor,
-    (SELECT watts 
-     FROM measurements 
-     WHERE serial_number = $2 
-     ORDER BY timestamp_utc DESC 
-     LIMIT 1) AS latest_demand,
-    i.cap_instalada
-FROM measurements m
-JOIN powermeters p ON m.serial_number = p.serial_number
-JOIN installations i ON p.installation_id = i.installation_id
-WHERE m.serial_number = $2
-    AND m.timestamp_utc >= DATE_TRUNC('month', NOW())
-    AND m.timestamp_utc < DATE_TRUNC('month', NOW() + INTERVAL '1 month')
-ORDER BY p.serial_number, m.timestamp_utc DESC;
-
+                WITH user_access AS (
+                    SELECT 
+                        1
+                    FROM 
+                        powermeters p
+                    JOIN 
+                        user_installations ui ON p.installation_id = ui.installation_id
+                    WHERE 
+                        ui.user_id = $1
+                        AND p.serial_number = $2
+                )
+                SELECT 
+                    kwh_imported_l1, kwh_imported_l2, kwh_imported_l3, kwh_imported_total
+                FROM 
+                    measurements
+                WHERE 
+                    serial_number = $2
+                    AND "timestamp_utc" < NOW()
+                    AND EXISTS (SELECT 1 FROM user_access)
+                ORDER BY 
+                    "timestamp_utc" DESC
+                LIMIT 1;
             `;
-
             const values = [userId, serialNumber];
             context.log(`Executing query: ${query} with values: ${values}`);
             const res = await client.query(query, values);
