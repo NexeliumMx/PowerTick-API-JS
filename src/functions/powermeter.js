@@ -1,81 +1,35 @@
 /**
- * Author: Arturo Vargas Cuevas
- * Last Modified Date: 06-12-2024
+ * FileName: src/functions/powermeter.js
+ * Author(s): Arturo Vargas
+ * Brief: HTTP POST endpoint to register a new powermeter in the dev or production schema.
+ * Date: 2025-05-23
  *
- * This function serves as an HTTP endpoint to manage powermeters in the database.
- * It provides:
- * 1. POST: Register a new powermeter.
- * 2. GET: Retrieve a powermeter by serial number.
+ * Description:
+ * This function serves as an HTTP POST endpoint to register a new powermeter in the dev or production schema.
+ * It validates the received payload against allowed powermeter fields, checks for required fields, and inserts the data into the appropriate schema table.
  *
- * POST:
- * Register a new powermeter in the database. The payload must include a valid set of fields.
+ * Copyright (c) 2025 BY: Nexelium Technological Solutions S.A. de C.V.
+ * All rights reserved.
+ * ---------------------------------------------------------------------------
  * Example:
- * curl -i -X POST http://localhost:7071/api/powermeter \
- * -H "Content-Type: application/json" \
- * -d '{
- *     "serial_number": "production0000010",
- *     "model": "Accurev1335",
- *     "thd_enable": "1"
- * }'
+ * Register a new powermeter:
+ * Local:
+ *    curl -i -X POST "http://localhost:7071/api/powermeter" -H "Content-Type: application/json" -d '{"dev":"true","serial_number":"production0000010","model":"Accurev1335","thd_enable":"1"}'
+ * Production:
+ *    curl -i -X POST "https://power-tick-api-js.nexelium.mx/api/powermeter" -H "Content-Type: application/json" -d '{"serial_number":"production0000010","model":"Accurev1335","thd_enable":"1"}'
  *
- * Expected Responses:
- * 1. Success:
- *    HTTP 200
- *    {
- *        "message": "Powermeter production0000010 was registered successfully in production.powermeters."
- *    }
+ * Expected Response (invalid fields):
+ * {
+ *   "error": "Invalid variable names detected.",
+ *   "invalidKeys": ["invalid_field"],
+ *   "validKeys": ["serial_number", "model", "thd_enable"]
+ * }
  *
- * 2. Invalid Field(s):
- *    HTTP 400
- *    {
- *        "error": "Invalid variable names detected.",
- *        "invalidKeys": ["invalid_field"],
- *        "validKeys": [
- *            "client_id", "serial_number", "manufacturer", "series", "model",
- *            "firmware_v", "branch", "location", "coordinates", "load_center",
- *            "register_date", "facturation_interval_months", "facturation_day",
- *            "time_zone", "productionice_address", "ct", "vt", "thd_enable"
- *        ]
- *    }
- *
- * 3. Database Error (e.g., duplicate key):
- *    HTTP 500
- *    {
- *        "error": "duplicate key value violates unique constraint \"powermeters_pkey\""
- *    }
- *
- * GET:
- * Retrieve a powermeter by its serial number (`sn` query parameter).
- * Example:
- * curl -X GET http://localhost:7071/api/powermeter?sn=production0000010
- *
- * Expected Responses:
- * 1. Success:
- *    HTTP 200
- *    {
- *        "serial_number": "production0000010",
- *        "model": "Accurev1335",
- *        "thd_enable": "1",
- *        ...
- *    }
- *
- * 2. Missing `sn` Parameter:
- *    HTTP 400
- *    {
- *        "error": "Missing required query parameter: sn"
- *    }
- *
- * 3. No Matching Powermeter:
- *    HTTP 404
- *    {
- *        "error": "No powermeter found with serial number: production9999999"
- *    }
- *
- * 4. Database Error:
- *    HTTP 500
- *    {
- *        "error": "<database error message>"
- *    }
+ * Expected Response (missing required):
+ * {
+ *   "error": "Missing required field(s): serial_number, model"
+ * }
+ * ---------------------------------------------------------------------------
  */
 
 const { app } = require('@azure/functions');
@@ -83,118 +37,87 @@ const { getClient } = require('./dbClient');
 const fs = require('fs');
 const path = require('path');
 
-// Load valid variable names from JSON file
-const validVariablesPath = path.join(__dirname, './validVariablesNames.json');
-let validVariables;
-
-try {
-    validVariables = JSON.parse(fs.readFileSync(validVariablesPath)).powermeters;
-} catch (err) {
-    console.error('Failed to load valid variable names:', err.message);
-    process.exit(1); // Exit if the file cannot be loaded
-}
+// Load valid powermeter variable names
+const validVarsPath = path.join(__dirname, 'validVariablesNames.json');
+const validVars = JSON.parse(fs.readFileSync(validVarsPath, 'utf8')).powermeters;
 
 app.http('powermeter', {
-    methods: ['POST', 'GET'],
+    methods: ['POST'],
     authLevel: 'anonymous',
     handler: async (request, context) => {
-        const method = request.method.toUpperCase();
-
-        if (method === 'POST') {
-            // Handle POST: Register a new powermeter
-            const data = await request.json();
-
-            // Validate keys against the valid variable list
-            const invalidKeys = Object.keys(data).filter(key => !validVariables.includes(key));
-            if (invalidKeys.length > 0) {
-                return {
-                    status: 400,
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                        error: "Invalid variable names detected.",
-                        invalidKeys,
-                        validKeys: validVariables
-                    })
-                };
-            }
-
-            // Build SQL query dynamically
-            const columns = Object.keys(data).join(", ");
-            const values = Object.keys(data).map((_, idx) => `$${idx + 1}`).join(", ");
-            const query = `INSERT INTO production.powermeters (${columns}) VALUES (${values});`;
-
-            let client;
-            try {
-                client = await getClient();
-                await client.query(query, Object.values(data));
-
-                return {
-                    status: 200,
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ message: `Powermeter ${data.serial_number} was registered successfully in production.powermeters.` })
-                };
-            } catch (error) {
-                console.error('Error inserting powermeter:', error);
-                return {
-                    status: 500,
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ error: error.message })
-                };
-            } finally {
-                if (client) {
-                    client.release();
-                }
-            }
-        } else if (method === 'GET') {
-            // Handle GET: Retrieve a powermeter by serial number
-            const serialNumber = request.query.get('sn');
-
-            if (!serialNumber) {
-                return {
-                    status: 400,
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ error: "Missing required query parameter: sn" })
-                };
-            }
-
-            const query = `SELECT * FROM production.powermeters WHERE serial_number = $1;`;
-
-            let client;
-            try {
-                client = await getClient();
-                const result = await client.query(query, [serialNumber]);
-
-                if (result.rows.length === 0) {
-                    return {
-                        status: 404,
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ error: `No powermeter found with serial number: ${serialNumber}` })
-                    };
-                }
-
-                return {
-                    status: 200,
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify(result.rows[0])
-                };
-            } catch (error) {
-                console.error('Error retrieving powermeter:', error);
-                return {
-                    status: 500,
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ error: error.message })
-                };
-            } finally {
-                if (client) {
-                    client.release();
-                }
-            }
-        } else {
-            // Handle unsupported methods
+        context.log(`Http function processed request for url "${request.url}"`);
+        let payload;
+        try {
+            payload = await request.json();
+        } catch (err) {
+            context.log('Invalid JSON payload');
             return {
-                status: 405,
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ error: "Method not allowed" })
+                status: 400,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ error: 'Invalid JSON payload.' })
+            };
+        }
+
+        // Validate variable names
+        const keys = Object.keys(payload);
+        const validKeys = keys.filter(k => validVars.includes(k));
+        const invalidKeys = keys.filter(k => !validVars.includes(k));
+
+        if (invalidKeys.length > 0) {
+            return {
+                status: 400,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    error: 'Invalid variable names detected.',
+                    invalidKeys,
+                    validKeys
+                })
+            };
+        }
+
+        // Check for required fields
+        if (!validKeys.includes('serial_number') || !validKeys.includes('model')) {
+            const missing = [
+                !validKeys.includes('serial_number') ? 'serial_number' : null,
+                !validKeys.includes('model') ? 'model' : null
+            ].filter(Boolean);
+            return {
+                status: 400,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ error: `Missing required field(s): ${missing.join(', ')}` })
+            };
+        }
+
+        // Determine schema
+        const schema = payload.dev === 'true' ? 'dev' : 'production';
+        // Remove dev from insert
+        const insertPayload = { ...payload };
+        delete insertPayload.dev;
+
+        // Prepare columns and values for parameterized query
+        const columns = Object.keys(insertPayload);
+        const values = Object.values(insertPayload);
+        const placeholders = columns.map((_, i) => `$${i + 1}`);
+
+        const query = `INSERT INTO ${schema}.powermeters (${columns.join(',')}) VALUES (${placeholders.join(',')})`;
+
+        try {
+            const client = await getClient();
+            context.log('Executing query:', query, 'with values:', values);
+            await client.query(query, values);
+            client.release();
+            context.log('Database insert executed successfully');
+            return {
+                status: 200,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ success: true, message: 'Powermeter registered successfully.' })
+            };
+        } catch (error) {
+            context.log.error('Error during database operation:', error);
+            return {
+                status: 500,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ success: false, message: `Database operation failed: ${error.message}` })
             };
         }
     }
