@@ -1,25 +1,32 @@
 /**
- * Author: Arturo Vargas Cuevas
- * Last Modified Date: 21-11-2024
+ * FileName: src/functions/dbClient.js
+ * Author(s): Arturo Vargas
+ * Brief: Provides a PostgreSQL connection pool for both local and Azure environments.
+ * Date: 2024-11-21
  *
- * This module provides a database connection pool using the `pg` library for PostgreSQL.
- * It supports two environments:
- * - **Local Development**: Utilizes traditional username/password authentication.
- * - **Azure Environment**: Implements token-based authentication with Azure Managed Identity.
+ * Description:
+ * This module exports a function to obtain a PostgreSQL client from a managed connection pool,
+ * supporting both local development and Azure deployments. For local use, it authenticates with
+ * username and password. In Azure, it leverages Managed Identity and token-based authentication
+ * via DefaultAzureCredential.
  *
- * Key Features:
- * - Initializes a connection pool (`initPool`) to manage database connections efficiently.
- * - Reuses the pool if it has already been created, optimizing resource usage.
- * - Uses `DefaultAzureCredential` to retrieve authentication tokens for Azure.
- * - Provides a function (`getClient`) to fetch a database client from the pool for executing queries.
+ * Copyright (c) 2024 BY: Nexelium Technological Solutions S.A. de C.V.
+ * All rights reserved.
  *
- * Conditions for the Code to Work:
- * - Environment variables (`PGHOST`, `PGDATABASE`, `PGPORT`, `PGUSER`, `PGPASSWORD`) must be correctly set.
- * - For Azure, Managed Identity must be configured and the application must have access to the PostgreSQL server.
- * - A valid token must be retrievable from Azure Managed Identity.
+ * ---------------------------------------------------------------------------
+ * Code Description:
+ * 1. Environment Detection: Determines whether the code is running locally or in Azure based on the ENVIRONMENT variable.
  *
- * How to import to other codes:
- * const { getClient } = require('./dbClient');
+ * 2. Pool Initialization: Initializes a singleton connection pool using the `pg` library. For local, uses standard credentials.
+ *    For Azure, retrieves an access token using DefaultAzureCredential and uses it as the password.
+ *
+ * 3. Pool Reuse: Ensures the pool is only created once and reused for subsequent requests, optimizing resource usage.
+ *
+ * 4. Client Retrieval: Exports an async `getClient` function that returns a pooled client for executing queries.
+ *
+ * 5. Configuration: Requires environment variables (`PGHOST`, `PGDATABASE`, `PGPORT`, `PGUSER`, `PGPASSWORD`) to be set.
+ *    For Azure, Managed Identity must be configured and the application must have access to the PostgreSQL server.
+ * ---------------------------------------------------------------------------
  */
 
 const { Pool } = require('pg');
@@ -27,7 +34,14 @@ const { DefaultAzureCredential } = require('@azure/identity');
 
 let pool;
 
-// Function to initialize and return a connection pool
+/**
+ * Initializes and returns a singleton PostgreSQL connection pool.
+ * Determines the environment (local or Azure) and configures the pool accordingly.
+ * For local, uses user/password authentication; for Azure, uses Managed Identity token.
+ * @since 1.0.0
+ * @return {Promise<Pool>} The initialized PostgreSQL connection pool.
+ * @throws {Error} If a valid Azure Managed Identity token cannot be retrieved.
+ */
 async function initPool() {
     if (pool) {
         console.log("Reusing existing connection pool.");
@@ -68,7 +82,12 @@ async function initPool() {
     return pool;
 }
 
-// Export function to get a client from the pool
+/**
+ * Fetches a PostgreSQL client from the connection pool for executing queries.
+ * Ensures the pool is initialized before returning a client.
+ * @since 1.0.0
+ * @return {Promise<import('pg').PoolClient>} A pooled PostgreSQL client.
+ */
 async function getClient() {
     const pool = await initPool();
     console.log("Fetching a client from the pool.");

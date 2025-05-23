@@ -5,7 +5,7 @@
  * This function serves as an HTTP POST endpoint to register a new reading in the database.
  * It dynamically validates the fields provided in the JSON payload against a predefined list 
  * of valid field names (loaded from `validVariablesNames.json`). If validation passes, it 
- * constructs an SQL query dynamically to insert the provided data into the `dev.measurements` table.
+ * constructs an SQL query dynamically to insert the provided data into the `production.measurements` table.
  *
  * Example:
  * Register a new reading:
@@ -13,7 +13,7 @@
  * -H "Content-Type: application/json" \
  * -d '{
  *     "timestamp": "2024-12-05T18:00:00.000Z",
- *     "serial_number": "DEV0000001",
+ *     "serial_number": "production0000001",
  *     "amps_total": 1182,
  *     "amps_phase_a": 170,
  *     "amps_phase_b": 490,
@@ -25,7 +25,7 @@
  * 1. Success: 
  *    HTTP 200 with a success message:
  *    {
- *        "message": "Reading for serial number DEV0000001 was registered successfully in dev.measurements."
+ *        "message": "Reading for serial number production0000001 was registered successfully in production.measurements."
  *    }
  *
  * 2. Invalid Field Test:
@@ -79,7 +79,7 @@ app.http('postReading', {
         // Build SQL query dynamically
         const columns = Object.keys(data).join(", ");
         const values = Object.keys(data).map((_, idx) => `$${idx + 1}`).join(", ");
-        const query = `INSERT INTO dev.measurements (${columns}) VALUES (${values});`;
+        const query = `INSERT INTO production.measurements (${columns}) VALUES (${values});`;
 
         let client;
         try {
@@ -89,7 +89,7 @@ app.http('postReading', {
             return {
                 status: 200,
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ message: `Reading for serial number ${data.serial_number} was registered successfully in dev.measurements.` })
+                body: JSON.stringify({ message: `Reading for serial number ${data.serial_number} was registered successfully in production.measurements.` })
             };
         } catch (error) {
             console.error('Error inserting reading:', error);

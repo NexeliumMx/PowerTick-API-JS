@@ -13,7 +13,7 @@
  * curl -i -X POST http://localhost:7071/api/powermeter \
  * -H "Content-Type: application/json" \
  * -d '{
- *     "serial_number": "DEV0000010",
+ *     "serial_number": "production0000010",
  *     "model": "Accurev1335",
  *     "thd_enable": "1"
  * }'
@@ -22,7 +22,7 @@
  * 1. Success:
  *    HTTP 200
  *    {
- *        "message": "Powermeter DEV0000010 was registered successfully in dev.powermeters."
+ *        "message": "Powermeter production0000010 was registered successfully in production.powermeters."
  *    }
  *
  * 2. Invalid Field(s):
@@ -34,7 +34,7 @@
  *            "client_id", "serial_number", "manufacturer", "series", "model",
  *            "firmware_v", "branch", "location", "coordinates", "load_center",
  *            "register_date", "facturation_interval_months", "facturation_day",
- *            "time_zone", "device_address", "ct", "vt", "thd_enable"
+ *            "time_zone", "productionice_address", "ct", "vt", "thd_enable"
  *        ]
  *    }
  *
@@ -47,13 +47,13 @@
  * GET:
  * Retrieve a powermeter by its serial number (`sn` query parameter).
  * Example:
- * curl -X GET http://localhost:7071/api/powermeter?sn=DEV0000010
+ * curl -X GET http://localhost:7071/api/powermeter?sn=production0000010
  *
  * Expected Responses:
  * 1. Success:
  *    HTTP 200
  *    {
- *        "serial_number": "DEV0000010",
+ *        "serial_number": "production0000010",
  *        "model": "Accurev1335",
  *        "thd_enable": "1",
  *        ...
@@ -68,7 +68,7 @@
  * 3. No Matching Powermeter:
  *    HTTP 404
  *    {
- *        "error": "No powermeter found with serial number: DEV9999999"
+ *        "error": "No powermeter found with serial number: production9999999"
  *    }
  *
  * 4. Database Error:
@@ -121,7 +121,7 @@ app.http('powermeter', {
             // Build SQL query dynamically
             const columns = Object.keys(data).join(", ");
             const values = Object.keys(data).map((_, idx) => `$${idx + 1}`).join(", ");
-            const query = `INSERT INTO dev.powermeters (${columns}) VALUES (${values});`;
+            const query = `INSERT INTO production.powermeters (${columns}) VALUES (${values});`;
 
             let client;
             try {
@@ -131,7 +131,7 @@ app.http('powermeter', {
                 return {
                     status: 200,
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ message: `Powermeter ${data.serial_number} was registered successfully in dev.powermeters.` })
+                    body: JSON.stringify({ message: `Powermeter ${data.serial_number} was registered successfully in production.powermeters.` })
                 };
             } catch (error) {
                 console.error('Error inserting powermeter:', error);
@@ -157,7 +157,7 @@ app.http('powermeter', {
                 };
             }
 
-            const query = `SELECT * FROM dev.powermeters WHERE serial_number = $1;`;
+            const query = `SELECT * FROM production.powermeters WHERE serial_number = $1;`;
 
             let client;
             try {
