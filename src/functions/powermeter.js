@@ -70,21 +70,22 @@ app.http('powermeter', {
                 body: JSON.stringify({
                     error: 'Invalid variable names detected.',
                     invalidKeys,
-                    validKeys
+                    validKeys: validVars // Return the full list of valid keys
                 })
             };
         }
 
         // Check for required fields
-        if (!validKeys.includes('serial_number') || !validKeys.includes('model')) {
-            const missing = [
-                !validKeys.includes('serial_number') ? 'serial_number' : null,
-                !validKeys.includes('model') ? 'model' : null
-            ].filter(Boolean);
+        const requiredFields = ['serial_number', 'model', 'time_zone'];
+        const missing = requiredFields.filter(field => !validKeys.includes(field));
+        if (missing.length > 0) {
             return {
                 status: 400,
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ error: `Missing required field(s): ${missing.join(', ')}` })
+                body: JSON.stringify({
+                    error: 'Missing required field(s).',
+                    requiredFields
+                })
             };
         }
 
