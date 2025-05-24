@@ -42,7 +42,6 @@
   ],
   "measurements": [
     "timestamp_utc",
-    "timestamp_tz",
     "serial_number",
     "current_total",
     "current_l1",

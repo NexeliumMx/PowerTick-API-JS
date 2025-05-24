@@ -1,34 +1,45 @@
 /**
  * FileName: src/functions/powermeter.js
  * Author(s): Arturo Vargas
- * Brief: HTTP POST endpoint to register a new powermeter in the dev or production schema.
+ * Brief: HTTP endpoint to register a new powermeter or fetch powermeter details by serial number across schemas.
  * Date: 2025-05-23
  *
  * Description:
- * This function serves as an HTTP POST endpoint to register a new powermeter in the dev or production schema.
- * It validates the received payload against allowed powermeter fields, checks for required fields, and inserts the data into the appropriate schema table.
+ * This function serves as an HTTP POST and GET endpoint for powermeters in the dev, demo, and production schemas.
+ *
+ * POST:
+ *   - Registers a new powermeter in the dev or production schema based on the 'dev' field in the payload.
+ *   - Validates incoming variable names against allowed powermeter fields (see validVariablesNames.json).
+ *   - Requires 'serial_number', 'model', and 'time_zone' fields in the payload.
+ *   - Protects against SQL injection using parameterized queries.
+ *   - Returns errors for invalid/missing fields, or a success message on insert.
+ *
+ * GET:
+ *   - Receives a serial number as a query parameter (?sn=...)
+ *   - Searches for the serial number in demo, dev, and production powermeters tables.
+ *   - If found, fetches and returns the full powermeter record from the first schema where it is found.
+ *   - If not found, returns a 404 error.
  *
  * Copyright (c) 2025 BY: Nexelium Technological Solutions S.A. de C.V.
  * All rights reserved.
  * ---------------------------------------------------------------------------
  * Example:
  * Register a new powermeter:
- * Local:
- *    curl -i -X POST "http://localhost:7071/api/powermeter" -H "Content-Type: application/json" -d '{"dev":"true","serial_number":"production0000010","model":"Accurev1335","thd_enable":"1"}'
- * Production:
- *    curl -i -X POST "https://power-tick-api-js.nexelium.mx/api/powermeter" -H "Content-Type: application/json" -d '{"serial_number":"production0000010","model":"Accurev1335","thd_enable":"1"}'
+ *   curl -i -X POST "http://localhost:7071/api/powermeter" -H "Content-Type: application/json" -d '{"dev":"true","serial_number":"production0000010","model":"Accurev1335","time_zone":"America/Mexico_City"}'
+ *   curl -i -X POST "https://power-tick-api-js.nexelium.mx/api/powermeter" -H "Content-Type: application/json" -d '{"serial_number":"production0000010","model":"Accurev1335","time_zone":"America/Mexico_City"}'
+ *
+ * Fetch powermeter details by serial number:
+ *   curl -X GET "http://localhost:7071/api/powermeter?sn=production0000010"
+ *   curl -X GET "https://power-tick-api-js.nexelium.mx/api/powermeter?sn=production0000010"
  *
  * Expected Response (invalid fields):
- * {
- *   "error": "Invalid variable names detected.",
- *   "invalidKeys": ["invalid_field"],
- *   "validKeys": ["serial_number", "model", "thd_enable"]
- * }
+ *   { "error": "Invalid variable names detected.", "invalidKeys": ["invalid_field"], "validKeys": [ ...all valid keys... ] }
  *
  * Expected Response (missing required):
- * {
- *   "error": "Missing required field(s): serial_number, model"
- * }
+ *   { "error": "Missing required field(s).", "requiredFields": ["serial_number", "model", "time_zone"] }
+ *
+ * Expected Response (not found):
+ *   { "error": "Serial number not found in any schema." }
  * ---------------------------------------------------------------------------
  */
 
@@ -42,10 +53,64 @@ const validVarsPath = path.join(__dirname, 'validVariablesNames.json');
 const validVars = JSON.parse(fs.readFileSync(validVarsPath, 'utf8')).powermeters;
 
 app.http('powermeter', {
-    methods: ['POST'],
+    methods: ['POST', 'GET'],
     authLevel: 'anonymous',
     handler: async (request, context) => {
-        context.log(`Http function processed request for url "${request.url}"`);
+        if (request.method === 'GET') {
+            // GET: Find which schema contains the serial_number
+            const url = new URL(request.url);
+            const serialNumber = url.searchParams.get('sn');
+            if (!serialNumber) {
+                return {
+                    status: 400,
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ error: 'Missing required query parameter: sn' })
+                };
+            }
+            const findSchemaQuery = `
+                SELECT 'demo' AS schema
+                FROM demo.powermeters
+                WHERE serial_number = $1
+                UNION ALL
+                SELECT 'dev' AS schema
+                FROM dev.powermeters
+                WHERE serial_number = $1
+                UNION ALL
+                SELECT 'production' AS schema
+                FROM production.powermeters
+                WHERE serial_number = $1;
+            `;
+            try {
+                const client = await getClient();
+                const schemaRes = await client.query(findSchemaQuery, [serialNumber]);
+                if (!schemaRes.rows.length) {
+                    client.release();
+                    return {
+                        status: 404,
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ error: 'Serial number not found in any schema.' })
+                    };
+                }
+                // Use the first found schema
+                const foundSchema = schemaRes.rows[0].schema;
+                const detailsQuery = `SELECT * FROM ${foundSchema}.powermeters WHERE serial_number = $1`;
+                const detailsRes = await client.query(detailsQuery, [serialNumber]);
+                client.release();
+                return {
+                    status: 200,
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(detailsRes.rows)
+                };
+            } catch (error) {
+                context.log.error('Error during database operation:', error);
+                return {
+                    status: 500,
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ success: false, message: `Database operation failed: ${error.message}` })
+                };
+            }
+        }
+
         let payload;
         try {
             payload = await request.json();
