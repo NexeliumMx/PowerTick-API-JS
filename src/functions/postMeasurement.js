@@ -3,55 +3,8 @@
  * Brief: HTTP POST endpoint to register a new measurement in the correct schema based on powermeter serial_number.
  * Date: 2025-05-23
  *
- * Description:
- * HTTP POST endpoint to register a new measurement in the correct schema based on powermeter serial_number.
- *
- * - Validates incoming variable names against allowed measurement fields (see validVariablesNames.json, "measurements" array).
- * - Requires 'timestamp_utc' and 'serial_number' fields in the payload.
- * - Validates 'timestamp_utc' is in ISO 8601 UTC format.
- * - Finds the schema for the powermeter using the serial_number.
- * - Inserts the measurement into the correct schema's measurements table.
- * - Returns errors for invalid/missing fields, invalid timestamp, or if serial_number is not found in any schema.
- * - Returns the exact error message from PostgreSQL if an error occurs during insert.
- *
- * Example:
- * Register a new Measurement:
- curl -i -X POST http://localhost:7071/api/postMeasurement \
- -H "Content-Type: application/json" \
- -d '{
-     "timestamp_utc": "2024-12-05T18:00:00.000Z",
-     "serial_number": "production0000010",
-     "current_total": 1182,
-     "current_l1": 170,
-     "current_l2": 490,
-     "current_l3": 522,
-     "voltage_ln": 126
-}'
- curl -i -X POST https://power-tick-api-js.nexelium.mx/api/postMeasurement \
- -H "Content-Type: application/json" \
- -d '{
-     "timestamp_utc": "2024-12-05T18:00:00.000Z",
-     "serial_number": "production0000010",
-     "current_total": 1182,
-     "current_l1": 170,
-     "current_l2": 490,
-     "current_l3": 522,
-     "voltage_ln": 126
-}'
- *
- * Responses:
- * 1. Success:
- *    HTTP 200 with a success message.
- * 2. Invalid Field Test:
- *    HTTP 400 with error and invalid/valid keys.
- * 3. Missing Required Field:
- *    HTTP 400 with error and requiredFields.
- * 4. Invalid Timestamp:
- *    HTTP 400 with error about timestamp_utc format.
- * 5. Serial Number Not Found:
- *    HTTP 404 with error.
- * 6. Database Error:
- *    HTTP 500 with error message from PostgreSQL.
+ * Copyright (c) 2025 BY: Nexelium Technological Solutions S.A. de C.V.
+ * All rights reserved.
  */
 
 const { app } = require('@azure/functions');

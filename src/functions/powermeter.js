@@ -1,46 +1,11 @@
 /**
  * FileName: src/functions/powermeter.js
  * Author(s): Arturo Vargas
- * Brief: HTTP endpoint to register a new powermeter or fetch powermeter details by serial number across schemas.
+ * Brief: This function serves as an HTTP POST and GET endpoint for powermeters in the dev, demo, and production schemas.
  * Date: 2025-05-23
- *
- * Description:
- * This function serves as an HTTP POST and GET endpoint for powermeters in the dev, demo, and production schemas.
- *
- * POST:
- *   - Registers a new powermeter in the dev or production schema based on the 'dev' field in the payload.
- *   - Validates incoming variable names against allowed powermeter fields (see validVariablesNames.json).
- *   - Requires 'serial_number', 'model', and 'time_zone' fields in the payload.
- *   - Protects against SQL injection using parameterized queries.
- *   - Returns errors for invalid/missing fields, or a success message on insert.
- *
- * GET:
- *   - Receives a serial number as a query parameter (?sn=...)
- *   - Searches for the serial number in demo, dev, and production powermeters tables.
- *   - If found, fetches and returns the full powermeter record from the first schema where it is found.
- *   - If not found, returns a 404 error.
  *
  * Copyright (c) 2025 BY: Nexelium Technological Solutions S.A. de C.V.
  * All rights reserved.
- * ---------------------------------------------------------------------------
- * Example:
- * Register a new powermeter:
- *   curl -i -X POST "http://localhost:7071/api/powermeter" -H "Content-Type: application/json" -d '{"dev":"true","serial_number":"production0000010","model":"Accurev1335","time_zone":"America/Mexico_City"}'
- *   curl -i -X POST "https://power-tick-api-js.nexelium.mx/api/powermeter" -H "Content-Type: application/json" -d '{"serial_number":"production0000010","model":"Accurev1335","time_zone":"America/Mexico_City"}'
- *
- * Fetch powermeter details by serial number:
- *   curl -X GET "http://localhost:7071/api/powermeter?sn=production0000010"
- *   curl -X GET "https://power-tick-api-js.nexelium.mx/api/powermeter?sn=production0000010"
- *
- * Expected Response (invalid fields):
- *   { "error": "Invalid variable names detected.", "invalidKeys": ["invalid_field"], "validKeys": [ ...all valid keys... ] }
- *
- * Expected Response (missing required):
- *   { "error": "Missing required field(s).", "requiredFields": ["serial_number", "model", "time_zone"] }
- *
- * Expected Response (not found):
- *   { "error": "Serial number not found in any schema." }
- * ---------------------------------------------------------------------------
  */
 
 const { app } = require('@azure/functions');

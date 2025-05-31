@@ -1,12 +1,13 @@
 /**
  * FileName: src/functions/fetchRealTimeData.js
  * Author(s): Arturo Vargas
- * Brief: HTTP GET endpoint to fetch the latest measurement entry for a specific powermeter.
+ * Brief: HTTP GET endpoint to fetch the latest measurement entry for a specific powermeter in the selected schema (production, dev, or demo).
  * Date: 2025-02-24
  *
  * Description:
- * This function serves as an HTTP GET endpoint to fetch the latest measurement entry for a specific powermeter.
+ * This function serves as an HTTP GET endpoint to fetch the latest measurement entry for a specific powermeter in the selected schema (production, dev, or demo).
  * It verifies that the user has access to the powermeter and then retrieves the latest measurement entry.
+ * The schema is selected via the `schema` query parameter (e.g., &schema=demo). If omitted or invalid, it defaults to 'production'.
  * The function obtains its query from the file:
  *    PowerTick-backend/postgresql/dataQueries/fetchData/fetchRealTimeData.sql
  * 
@@ -15,11 +16,11 @@
  * 
  * ---------------------------------------------------------------------------
  * Code Description:
- * 1. Query Parameters: The function expects query parameters `user_id` and `serial_number` to identify the user and powermeter.
+ * 1. Query Parameters: The function expects query parameters `user_id`, `serial_number`, and optional `schema` (defaults to 'production').
  *
  * 2. Database Connection: It connects to the PostgreSQL database using a client from dbClient.js.
  *
- * 3. Schema Setting: The function sets the search path to the desired schema (`demo`).
+ * 3. Schema Selection: The function uses the `schema` query parameter to select the schema (`production`, `dev`, or `demo`). If omitted or invalid, defaults to `production`.
  *
  * 4. Query Execution: It executes a query to fetch the latest measurement entry for the specified powermeter, 
  *    ensuring that the user has access to the powermeter.
@@ -30,8 +31,8 @@
  * Example:
  * Fetch real-time data for a powermeter:
  * Local:
- *    curl -i -X GET "http://localhost:7071/api/fetchRealTimeData?user_id=4c7c56fe-99fc-4611-b57a-0d5683f9bc95&serial_number=DEMO000001"
- * Production:
+ *    curl -i -X GET "http://localhost:7071/api/fetchRealTimeData?user_id=4c7c56fe-99fc-4611-b57a-0d5683f9bc95&serial_number=DEMO000001&schema=demo"
+ * Production (schema omitted, defaults to production):
  *    curl -i -X GET "https://power-tick-api-js.nexelium.mx/api/fetchRealTimeData?user_id=4c7c56fe-99fc-4611-b57a-0d5683f9bc95&serial_number=DEMO000001"
  *
  * Expected Response:
@@ -50,7 +51,11 @@ app.http('fetchRealTimeData', {
 
         const userId = request.query.get('user_id');
         const serialNumber = request.query.get('serial_number');
-        context.log(`Received user_id: ${userId}, serial_number: ${serialNumber}`);
+        let schema = request.query.get('schema');
+        if (!schema || !['production', 'dev', 'demo'].includes(schema)) {
+            schema = 'production';
+        }
+        context.log(`Received user_id: ${userId}, serial_number: ${serialNumber}, schema: ${schema}`);
 
         if (!userId || !serialNumber) {
             context.log('user_id or serial_number is missing in the request');
@@ -62,44 +67,28 @@ app.http('fetchRealTimeData', {
         }
 
         try {
-            const client = await getClient();  // Reuse the connected client from dbClient.js
-
-            // Set the search path to the desired schema
-            await client.query('SET search_path TO demo');
-
+            const client = await getClient();
             // Query to fetch the latest measurement entry for the specified powermeter
             const query = `
                 WITH user_access AS (
-                    SELECT 
-                        1
-                    FROM 
-                        powermeters p
-                    JOIN 
-                        user_installations ui ON p.installation_id = ui.installation_id
-                    WHERE 
-                        ui.user_id = $1
-                        AND p.serial_number = $2
+                    SELECT 1
+                    FROM ${schema}.powermeters p
+                    JOIN ${schema}.user_installations ui ON p.installation_id = ui.installation_id
+                    WHERE ui.user_id = $1 AND p.serial_number = $2
                 )
-                SELECT 
-                    *
-                FROM 
-                    measurements
-                WHERE 
-                    serial_number = $2
+                SELECT *
+                FROM ${schema}.measurements
+                WHERE serial_number = $2
                     AND "timestamp_utc" < NOW()
                     AND EXISTS (SELECT 1 FROM user_access)
-                ORDER BY 
-                    "timestamp_utc" DESC
+                ORDER BY "timestamp_utc" DESC
                 LIMIT 1;
             `;
             const values = [userId, serialNumber];
             context.log(`Executing query: ${query} with values: ${values}`);
             const res = await client.query(query, values);
-            client.release(); // Release client back to the pool
-
+            client.release();
             context.log("Database query executed successfully:", res.rows);
-
-            // Return success message as HTTP response
             return {
                 status: 200,
                 headers: { 'Content-Type': 'application/json' },
