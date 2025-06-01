@@ -114,7 +114,7 @@ app.http('powermeter', {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     error: 'Missing required field(s).',
-                    requiredFields
+                    missing
                 })
             };
         }
