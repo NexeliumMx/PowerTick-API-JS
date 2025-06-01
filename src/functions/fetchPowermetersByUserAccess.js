@@ -11,7 +11,7 @@
 const { app } = require('@azure/functions');
 const { getClient } = require('./dbClient');
 
-const ALLOWED_SCHEMAS = ['public', 'demo', 'dev'];
+const ALLOWED_ENVIROMENTS = ['public', 'demo', 'dev'];
 
 app.http('fetchPowermetersByUserAccess', {
     methods: ['GET'],
@@ -20,17 +20,17 @@ app.http('fetchPowermetersByUserAccess', {
         context.log(`Http function processed request for url "${request.url}"`);
 
         const userId = request.query.get('user_id');
-        let schema = request.query.get('schema') || 'public';
+        let enviroment = request.query.get('enviroment') || 'public';
         context.log(`Received user_id: ${userId}`);
-        context.log(`Received schema: ${schema}`);
+        context.log(`Received enviroment: ${enviroment}`);
 
-        // Validate schema parameter to avoid injection
-        if (!ALLOWED_SCHEMAS.includes(schema)) {
-            context.log('Invalid schema parameter');
+        // Validate enviroment parameter to avoid injection
+        if (!ALLOWED_ENVIROMENTS.includes(enviroment)) {
+            context.log('Invalid enviroment parameter');
             return {
                 status: 400,
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ success: false, message: 'Invalid schema' })
+                body: JSON.stringify({ success: false, message: 'Invalid enviroment' })
             };
         }
 
@@ -47,7 +47,7 @@ app.http('fetchPowermetersByUserAccess', {
             const client = await getClient();
 
             // Dynamically build schema-qualified table name for powermeters only
-            const powermetersTable = `${schema}.powermeters`;
+            const powermetersTable = `${enviroment}.powermeters`;
             const userInstallationsTable = `public.user_installations`;
 
             // Query to fetch powermeters by user access
