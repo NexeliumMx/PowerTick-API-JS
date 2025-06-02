@@ -68,7 +68,7 @@ app.http('consumptionHistory', {
             WHERE m."timestamp" >= $3
               AND m."timestamp" < $4
               AND m."timestamp" <= NOW()
-            ORDER BY m."timestamp" DESC;
+            ORDER BY m."timestamp" ASC;
         `;
 
         const params = [user_id, powermeter_id, start_utc, end_utc];
