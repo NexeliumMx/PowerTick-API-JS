@@ -1,8 +1,8 @@
 /**
  * FileName: src/functions/powermeter.js
  * Author(s): Arturo Vargas
- * Brief: This function serves as an HTTP POST and GET endpoint for powermeters in the dev, demo, and production schemas.
- * Date: 2025-05-23
+ * Brief: This function serves as an HTTP POST and GET endpoint for powermeters in the dev, demo, and public schemas.
+ * Date: 2025-06-02
  *
  * Copyright (c) 2025 BY: Nexelium Technological Solutions S.A. de C.V.
  * All rights reserved.
@@ -13,6 +13,9 @@ const { getClient } = require('./dbClient');
 const fs = require('fs');
 const path = require('path');
 
+// Only allow these enviroments to avoid SQL injection on schema
+const ALLOWED_ENVIROMENTS = ['production', 'demo', 'dev'];
+
 // Load valid powermeter variable names
 const validVarsPath = path.join(__dirname, 'validVariablesNames.json');
 const validVars = JSON.parse(fs.readFileSync(validVarsPath, 'utf8')).powermeters;
@@ -21,46 +24,45 @@ app.http('powermeter', {
     methods: ['POST', 'GET'],
     authLevel: 'anonymous',
     handler: async (request, context) => {
+        // === GET METHOD ===
         if (request.method === 'GET') {
-            // GET: Find which schema contains the serial_number
+            // Parse URL and query parameters
             const url = new URL(request.url);
-            const serialNumber = url.searchParams.get('sn');
-            if (!serialNumber) {
+            const powermeterId = url.searchParams.get('id');
+            const enviroment = url.searchParams.get('enviroment');
+
+            // Require id parameter
+            if (!powermeterId) {
                 return {
                     status: 400,
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ error: 'Missing required query parameter: sn' })
+                    body: JSON.stringify({ error: 'Missing required query parameter: id' })
                 };
             }
-            const findSchemaQuery = `
-                SELECT 'demo' AS schema
-                FROM demo.powermeters
-                WHERE serial_number = $1
-                UNION ALL
-                SELECT 'dev' AS schema
-                FROM dev.powermeters
-                WHERE serial_number = $1
-                UNION ALL
-                SELECT 'production' AS schema
-                FROM production.powermeters
-                WHERE serial_number = $1;
-            `;
+
+            // SQL injection-safe schema selection
+            let schema = 'public';
+            if (typeof enviroment === 'string') {
+                const env = enviroment.toLowerCase();
+                if (ALLOWED_ENVIROMENTS.includes(env)) {
+                    schema = env === 'production' ? 'public' : env;
+                }
+            }
+
+            // Query powermeter in the chosen schema
+            const detailsQuery = `SELECT * FROM ${schema}.powermeters WHERE powermeter_id = $1`;
+
             try {
                 const client = await getClient();
-                const schemaRes = await client.query(findSchemaQuery, [serialNumber]);
-                if (!schemaRes.rows.length) {
-                    client.release();
+                const detailsRes = await client.query(detailsQuery, [powermeterId]);
+                client.release();
+                if (!detailsRes.rows.length) {
                     return {
                         status: 404,
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ error: 'Serial number not found in any schema.' })
+                        body: JSON.stringify({ error: `Powermeter ID not found in ${schema} schema.` })
                     };
                 }
-                // Use the first found schema
-                const foundSchema = schemaRes.rows[0].schema;
-                const detailsQuery = `SELECT * FROM ${foundSchema}.powermeters WHERE serial_number = $1`;
-                const detailsRes = await client.query(detailsQuery, [serialNumber]);
-                client.release();
                 return {
                     status: 200,
                     headers: { 'Content-Type': 'application/json' },
@@ -76,6 +78,7 @@ app.http('powermeter', {
             }
         }
 
+        // === POST METHOD ===
         let payload;
         try {
             payload = await request.json();
@@ -119,11 +122,18 @@ app.http('powermeter', {
             };
         }
 
-        // Determine schema
-        const schema = payload.dev === 'true' ? 'dev' : 'production';
-        // Remove dev from insert
+        // SQL injection-safe schema selection
+        let schema = 'public';
+        if (typeof payload.enviroment === 'string') {
+            const env = payload.enviroment.toLowerCase();
+            if (ALLOWED_ENVIROMENTS.includes(env)) {
+                schema = env === 'production' ? 'public' : env;
+            }
+        }
+
+        // Remove enviroment from insert
         const insertPayload = { ...payload };
-        delete insertPayload.dev;
+        delete insertPayload.enviroment;
 
         // Prepare columns and values for parameterized query
         const columns = Object.keys(insertPayload);

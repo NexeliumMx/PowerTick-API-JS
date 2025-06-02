@@ -1,6 +1,6 @@
 {
   "powermeters": [
-    "dev",
+    "enviroment",
     "client_id",
     "installation_id",
     "powermeter_alias",
@@ -41,7 +41,7 @@
     "reset_dmd_max"
   ],
   "measurements": [
-    "timestamp_utc",
+    "timestamp",
     "serial_number",
     "current_total",
     "current_l1",

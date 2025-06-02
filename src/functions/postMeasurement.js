@@ -1,7 +1,7 @@
 /**
  * Author(s): Arturo Vargas
  * Brief: HTTP POST endpoint to register a new measurement in the correct schema based on powermeter serial_number.
- * Date: 2025-05-23
+ * Date: 2025-06-02
  *
  * Copyright (c) 2025 BY: Nexelium Technological Solutions S.A. de C.V.
  * All rights reserved.
@@ -21,8 +21,13 @@ app.http('postMeasurement', {
     authLevel: 'anonymous',
     handler: async (request, context) => {
         let payload;
+
+        context.log('--- POST /postMeasurement: Started ---');
+
+        // Parse and validate JSON
         try {
             payload = await request.json();
+            context.log('Payload received:', JSON.stringify(payload));
         } catch (err) {
             context.log('Invalid JSON payload');
             return {
@@ -32,10 +37,11 @@ app.http('postMeasurement', {
             };
         }
 
-        // Validate variable names
+        // Validate variable names against allowed keys
         const keys = Object.keys(payload);
         const validKeys = keys.filter(k => validVars.includes(k));
         const invalidKeys = keys.filter(k => !validVars.includes(k));
+
         if (invalidKeys.length > 0) {
             return {
                 status: 400,
@@ -49,8 +55,9 @@ app.http('postMeasurement', {
         }
 
         // Check for required fields
-        const requiredFields = ['timestamp_utc', 'serial_number'];
+        const requiredFields = ['timestamp', 'serial_number'];
         const missing = requiredFields.filter(field => !validKeys.includes(field));
+
         if (missing.length > 0) {
             return {
                 status: 400,
@@ -62,31 +69,24 @@ app.http('postMeasurement', {
             };
         }
 
-        // Validate timestamp_utc is ISO 8601 and UTC
-        const ts = payload.timestamp_utc;
-        const iso8601utc = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
-        if (!iso8601utc.test(ts)) {
-            return {
-                status: 400,
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    error: 'timestamp_utc must be in ISO 8601 UTC format (e.g., 2024-12-05T18:00:00.000Z).'
-                })
-            };
-        }
+        // Do NOT validate timestamp format anymore
 
-        // Find schema for serial_number
+        // Find schema and powermeter_id for serial_number
         const serialNumber = payload.serial_number;
+
         const findSchemaQuery = `
-            SELECT 'demo' AS schema FROM demo.powermeters WHERE serial_number = $1
+            SELECT 'demo' AS schema, powermeter_id FROM demo.powermeters WHERE serial_number = $1
             UNION ALL
-            SELECT 'dev' AS schema FROM dev.powermeters WHERE serial_number = $1
+            SELECT 'dev' AS schema, powermeter_id FROM dev.powermeters WHERE serial_number = $1
             UNION ALL
-            SELECT 'production' AS schema FROM production.powermeters WHERE serial_number = $1;
+            SELECT 'public' AS schema, powermeter_id FROM public.powermeters WHERE serial_number = $1;
         `;
+
         try {
             const client = await getClient();
+
             const schemaRes = await client.query(findSchemaQuery, [serialNumber]);
+
             if (!schemaRes.rows.length) {
                 client.release();
                 return {
@@ -95,47 +95,25 @@ app.http('postMeasurement', {
                     body: JSON.stringify({ error: 'Serial number not found in any schema.' })
                 };
             }
-            const schema = schemaRes.rows[0].schema;
-            // Get time_zone for this powermeter
-            const tzRes = await client.query(
-                `SELECT time_zone FROM ${schema}.powermeters WHERE serial_number = $1`,
-                [serialNumber]
-            );
-            if (!tzRes.rows.length) {
-                client.release();
-                return {
-                    status: 404,
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ error: 'Time zone not found for this powermeter.' })
-                };
-            }
-            const timeZone = tzRes.rows[0].time_zone;
-            // Convert timestamp_utc to timestamp_tz in the powermeter's time zone
-            const timestamp_utc = payload.timestamp_utc;
-            const tzQuery = `SELECT ($1::timestamptz AT TIME ZONE 'UTC') AT TIME ZONE $2 AS timestamp_tz`;
-            const tzValRes = await client.query(tzQuery, [timestamp_utc, timeZone]);
-            const timestamp_tz = tzValRes.rows[0].timestamp_tz;
+
+            // Use the first found match (should only ever match one env)
+            const { schema, powermeter_id } = schemaRes.rows[0];
+
             // Prepare insert
-            // Remove timestamp_tz if present in payload
-            const insertPayload = { ...payload };
-            delete insertPayload.timestamp_tz;
+            // Remove serial_number from payload, add powermeter_id
+            const { serial_number, ...restPayload } = payload; // destructure to remove serial_number
+            const insertPayload = { ...restPayload, powermeter_id };
             const columns = Object.keys(insertPayload);
             const values = Object.values(insertPayload);
             const placeholders = columns.map((_, i) => `$${i + 1}`);
-            // Build the insert query with timestamp_tz as a subquery
-            const insertColumns = [...columns];
-            const insertPlaceholders = [...placeholders];
-            // Insert timestamp_tz after timestamp_utc
-            const tsUtcIdx = insertColumns.indexOf('timestamp_utc');
-            insertColumns.splice(tsUtcIdx + 1, 0, 'timestamp_tz');
-            insertPlaceholders.splice(tsUtcIdx + 1, 0, `(
-                $${tsUtcIdx + 1}::timestamptz AT TIME ZONE (
-                    SELECT time_zone FROM ${schema}.powermeters WHERE serial_number = $${columns.indexOf('serial_number') + 1}
-                )
-            )`);
-            const insertQuery = `INSERT INTO ${schema}.measurements (${insertColumns.join(',')}) VALUES (${insertPlaceholders.join(',')})`;
-            await client.query(insertQuery, values);
+
+            context.log('Insert query:', `INSERT INTO ${schema}.measurements (${columns.join(',')}) VALUES (${placeholders.join(',')})`);
+
+            await client.query(`INSERT INTO ${schema}.measurements (${columns.join(',')}) VALUES (${placeholders.join(',')})`, values);
             client.release();
+
+            context.log('Measurement inserted successfully.');
+
             return {
                 status: 200,
                 headers: { 'Content-Type': 'application/json' },
@@ -153,4 +131,3 @@ app.http('postMeasurement', {
         }
     }
 });
-
