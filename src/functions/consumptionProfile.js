@@ -70,8 +70,7 @@ app.http('consumptionProfile', {
                     EXTRACT(hour FROM ('1970-01-01 00:00:00' AT TIME ZONE time_zone)
                         - '1970-01-01 00:00:00'::timestamp) AS offset_hours
                 FROM authorized_powermeter
-            )
-        `;
+            )`;
 
         let selectQuery;
         if (time_interval === 'hour') {
