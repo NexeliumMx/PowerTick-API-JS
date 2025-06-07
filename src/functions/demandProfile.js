@@ -3,7 +3,7 @@
  * Author(s): Arturo Vargas
  * Endpoint: /api/demandProfile
  * Brief: Returns grouped energy demand profile (hourly, daily, or monthly).
- * Date: 2025-06-02
+ * Date: 2025-06-05
  * 
  * Copyright (c) 2025 BY: Nexelium Technological Solutions S.A. de C.V.
  * All rights reserved.
