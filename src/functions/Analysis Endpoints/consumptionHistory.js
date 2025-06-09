@@ -1,8 +1,8 @@
 /**
  * File: demandHistory.js
  * Author(s): Arturo Vargas
- * Endpoint: GET /api/demandHistory
- * Brief: Fetch demand (watts, var) measurements for a powermeter, validating user access and UTC range.
+ * Endpoint: GET /api/consumptionHistory
+ * Brief: Fetch consumption (kWh, varh) measurements for a powermeter, validating user access and UTC range.
  * Date: 2025-06-02
  * 
  * Copyright (c) 2025 BY: Nexelium Technological Solutions S.A. de C.V.
@@ -10,7 +10,7 @@
  */
 
 const { app } = require('@azure/functions');
-const { getClient } = require('./dbClient');
+const { getClient } = require('../dbClient');
 
 const ALLOWED_ENVIROMENTS = ['production', 'demo', 'dev'];
 
@@ -20,7 +20,7 @@ function getSchema(env) {
     return null;
 }
 
-app.http('demandHistory', {
+app.http('consumptionHistory', {
     methods: ['GET'],
     authLevel: 'anonymous',
     handler: async (request, context) => {
@@ -61,8 +61,8 @@ app.http('demandHistory', {
             )
             SELECT
                 m."timestamp" AS utc_time,
-                m.watts AS real_power_w,
-                m.var AS reactive_power_var
+                m.kwh_imported_total AS real_energy_wh,
+                m.varh_imported_q1 AS reactive_energy_varh
             FROM ${measurementsTable} m
             JOIN authorized_powermeter ap ON m.powermeter_id = ap.powermeter_id
             WHERE m."timestamp" >= $3

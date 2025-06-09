@@ -18,7 +18,7 @@
  */
 
 const { app } = require('@azure/functions');
-const { getClient } = require('./dbClient');
+const { getClient } = require('../dbClient');
 
 const ALLOWED_ENVIROMENTS = ['production', 'demo', 'dev'];
 const TIME_INTERVALS = ['hour', 'day', 'month'];
