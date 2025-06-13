@@ -19,7 +19,6 @@ app.http('thdCurrentProfile', {
         if (!TIME_INTERVALS.includes(time_interval)) {
             return { status: 400, body: JSON.stringify({ error: "Invalid time_interval" }) };
         }
-
         // Schema selection
         let schema = 'public';
         if (enviroment === 'demo') schema = 'demo';
