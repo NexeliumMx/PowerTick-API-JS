@@ -1,13 +1,18 @@
 const { app } = require('@azure/functions');
+const { getClient } = require('../dbClient');
+
+const ALLOWED_ENVIROMENTS = ['production', 'demo', 'dev'];
+
+function getSchema(env) {
+    if (!env || env === 'production') return 'public';
+    if (ALLOWED_ENVIROMENTS.includes(env)) return env;
+    return null;
+}
 
 app.http('thdVoltageLNProfile', {
     methods: ['GET', 'POST'],
     authLevel: 'anonymous',
     handler: async (request, context) => {
-        context.log(`Http function processed request for url "${request.url}"`);
-
-        const name = request.query.get('name') || await request.text() || 'world';
-
-        return { body: `Hello, ${name}!` };
+                       
     }
 });

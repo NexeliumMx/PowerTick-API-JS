@@ -1,4 +1,9 @@
 const { app } = require('@azure/functions');
+const { getClient } = require('../dbClient');
+
+const ALLOWED_ENVIROMENTS = ['production', 'demo', 'dev'];
+const TIME_INTERVALS = ['hour', 'day', 'month'];
+
 
 app.http('thdCurrentProfile', {
     methods: ['GET', 'POST'],
@@ -56,9 +61,6 @@ app.http('thdCurrentProfile', {
                         m."timestamp",
                         ('1970-01-01 ' || LPAD((0 - pi.offset_hours)::text, 2, '0') || ':00:00+00')::timestamptz
                     ) AS hour_start_utc,
-                    avg(m.current_l1) AS l1_avg,
-                    avg(m.current_l2) AS l2_avg,
-                   avg(m.current_l3) AS l3_avg,
                    avg(m.thd_current_l1) AS Thdl1_avg,
                    avg(m.thd_current_l2) AS Thdl2_avg,
                   avg(m.thd_current_l3) AS Thdl3_avg
@@ -78,9 +80,6 @@ app.http('thdCurrentProfile', {
                         m."timestamp",
                         ('1970-01-01 ' || LPAD((0 - pi.offset_hours)::text, 2, '0') || ':00:00+00')::timestamptz
                     ) AS day_start_utc,
-                   avg(m.current_l1) AS l1_avg,
-                    avg(m.current_l2) AS l2_avg,
-                   avg(m.current_l3) AS l3_avg,
                    avg(m.thd_current_l1) AS Thdl1_avg,
                    avg(m.thd_current_l2) AS Thdl2_avg,
                   avg(m.thd_current_l3) AS Thdl3_avg
@@ -111,9 +110,6 @@ app.http('thdCurrentProfile', {
                             ),
                             'YYYY-MM'
                         ) AS local_month,
-                        avg(m.current_l1) AS l1_avg,
-                    avg(m.current_l2) AS l2_avg,
-                   avg(m.current_l3) AS l3_avg,
                    avg(m.thd_current_l1) AS Thdl1_avg,
                    avg(m.thd_current_l2) AS Thdl2_avg,
                   avg(m.thd_current_l3) AS Thdl3_avg
@@ -126,9 +122,6 @@ app.http('thdCurrentProfile', {
                 )
                 SELECT
                     local_month AS month_start_local,
-                    l1_avg,
-                    l2_avg,
-                    l3_avg,
                     Thdl1_avg,
                     Thdl2_avg,
                     Thdl3_avg
