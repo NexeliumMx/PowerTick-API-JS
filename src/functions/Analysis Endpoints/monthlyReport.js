@@ -78,6 +78,12 @@ app.http('monthlyReport', {
         const params = [user_id, powermeter_id, year];
 
         try {
+            context.log('Handler started');
+            context.log(`Received user_id: ${user_id}, powermeter_id: ${powermeter_id}, year: ${year}, environment: ${enviroment}`);
+            context.log(`Using schema: ${schema}`);
+            context.log(`Executing query: ${query}`);
+            context.log(`With parameters: ${params}`);
+
             const client = await getClient();
             const result = await client.query(query, params);
 
@@ -96,7 +102,3 @@ app.http('monthlyReport', {
         }
     }
 });
-
-if (variable && variable.length) {
-    // Safe to access length
-}
