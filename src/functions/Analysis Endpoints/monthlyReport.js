@@ -8,6 +8,9 @@
  * 
  * Copyright (c) 2025 BY: Nexelium Technological Solutions S.A. de C.V.
  * All rights reserved.
+ * 4c7c56fe-99fc-4611-b57a-0d5683f9bc95
+ * 5
+ * 
  */
 
 const { app } = require('@azure/functions');
@@ -61,7 +64,7 @@ app.http('monthlyReport', {
     )
     SELECT
         DATE_TRUNC('month', m."timestamp") AS month,
-        AVG(m.powerfactor) AS avg_power_factor,
+        AVG(m.power_factor) AS avg_power_factor,
         MAX(m.watts) AS max_demand,
         MAX(m.kwh_imported_total) - MIN(m.kwh_imported_total) AS consumption
     FROM ${measurementsTable} m
