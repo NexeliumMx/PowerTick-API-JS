@@ -16,4 +16,4 @@ require('./functions/Analysis Endpoints/thdVoltageLLProfile');
 require('./functions/Analysis Endpoints/thdVoltageLNHistory');
 require('./functions/Analysis Endpoints/thdVoltageLNProfile');
 require('./functions/Analysis Endpoints/monthlyReport');
-require('./functions/Analysis Endpoints/loadCenter');
+require('./functions/Analysis Endpoints/loadCenters');
