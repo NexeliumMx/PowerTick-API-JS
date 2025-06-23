@@ -64,9 +64,9 @@ app.http('monthlyReport', {
     )
     SELECT
         DATE_TRUNC('month', m."timestamp") AS month,
-        AVG(m.power_factor) AS avg_power_factor,
-        MAX(m.watts) AS max_demand,
-        MAX(m.kwh_imported_total) - MIN(m.kwh_imported_total) AS consumption
+        avg(m.power_factor) AS avg_power_factor,
+        max(m.watts) AS max_demand,
+        last(m.kwh_imported_total, m."timestamp")-first(m.kwh_imported_total, m."timestamp") AS consumption
     FROM ${measurementsTable} m
     JOIN authorized_powermeter ap ON m.powermeter_id = ap.powermeter_id
     WHERE m."timestamp" >= DATE_TRUNC('year', TO_TIMESTAMP($3, 'YYYY'))
