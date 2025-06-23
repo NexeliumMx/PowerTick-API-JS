@@ -1,6 +1,6 @@
 /**
  * File: monthlyReport.js
- * Author(s): Luis Sanchez
+ * Author(s): Andres Gomez
  * Endpoint: GET /api/monthlyReprt
  * Brief: Fetch avg PF, max demand, totl consumption for each month of
  * a selected year, validating user access.
