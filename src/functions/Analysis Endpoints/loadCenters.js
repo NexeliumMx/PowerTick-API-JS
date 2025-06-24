@@ -69,7 +69,7 @@ app.http('loadCenters', {
                     last(m.watts, m."timestamp") AS last_demand,
                     avg(m.watts) AS avg_demand,
                     max(m.watts) AS max_demand,
-                    avg(m.power_factor) AS avg_power_factor
+                    avg(m.power_factor) AS avg_power_factor,
                     last(m.power_factor, m."timestamp") AS last_power_factor
                 FROM ${schema}.measurements m
                 JOIN authorized_powermeter ap ON m.powermeter_id = ap.powermeter_id
