@@ -70,6 +70,7 @@ app.http('loadCenters', {
                     avg(m.watts) AS avg_demand,
                     max(m.watts) AS max_demand,
                     avg(m.power_factor) AS avg_power_factor
+                    last(m.power_factor, m."timestamp") AS last_power_factor
                 FROM ${schema}.measurements m
                 JOIN authorized_powermeter ap ON m.powermeter_id = ap.powermeter_id
                 CROSS JOIN month_range
@@ -83,7 +84,8 @@ app.http('loadCenters', {
                 d.avg_demand,
                 d.max_demand,
                 d.avg_power_factor,
-                d.last_demand
+                d.last_demand,
+                d.last_power_factor
             FROM consumption c
             JOIN demand d ON c.powermeter_id = d.powermeter_id
             ORDER BY c.powermeter_id;
