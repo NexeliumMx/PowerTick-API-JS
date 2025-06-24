@@ -82,7 +82,7 @@ app.http('loadCenters', {
                 c.consumption,
                 d.avg_demand,
                 d.max_demand,
-                d.avg_power_factor
+                d.avg_power_factor,
                 d.last_demand
             FROM consumption c
             JOIN demand d ON c.powermeter_id = d.powermeter_id
