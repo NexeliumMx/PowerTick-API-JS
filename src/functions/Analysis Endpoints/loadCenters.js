@@ -66,6 +66,7 @@ app.http('loadCenters', {
             demand AS (
                 SELECT
                     m.powermeter_id,
+                    last(m.watts, m."timestamp") AS last_demand,
                     avg(m.watts) AS avg_demand,
                     max(m.watts) AS max_demand,
                     avg(m.power_factor) AS avg_power_factor
@@ -82,6 +83,7 @@ app.http('loadCenters', {
                 d.avg_demand,
                 d.max_demand,
                 d.avg_power_factor
+                d.last_demand
             FROM consumption c
             JOIN demand d ON c.powermeter_id = d.powermeter_id
             ORDER BY c.powermeter_id;
