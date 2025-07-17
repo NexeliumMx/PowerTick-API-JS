@@ -83,7 +83,7 @@ app.http('thdVoltageLLHistory', {
         try {
             const client = await getClient();
             const result = await client.query(query, params);
-
+            client.release();
             return {
                 status: 200,
                 headers: { 'Content-Type': 'application/json' },

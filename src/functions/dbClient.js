@@ -91,7 +91,7 @@ async function initPool() {
 async function getClient() {
     const pool = await initPool();
     console.log("Fetching a client from the pool.");
-    return pool; // Returns a pooled client
+    return pool.connect(); // Returns a pooled client
 }
 
 module.exports = { getClient };

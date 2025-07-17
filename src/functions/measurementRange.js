@@ -53,6 +53,7 @@ app.http('measurementRange', {
                 WHERE p.powermeter_id = $1;
             `;
             const result = await client.query(sql, [powermeterId]);
+            client.release();
             if (result.rows.length === 0) {
                 return { status: 404, body: JSON.stringify({ error: 'Not found' }) };
             }
@@ -60,8 +61,6 @@ app.http('measurementRange', {
         } catch (err) {
             context.log('Error fetching measurement range:', err);
             return { status: 500, body: JSON.stringify({ error: 'Internal server error' }) };
-        } finally {
-            await client.end();
-        }
+        } 
     }
 });

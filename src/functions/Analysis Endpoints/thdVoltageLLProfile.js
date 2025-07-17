@@ -184,6 +184,7 @@ app.http('thdVoltageLLProfile', {
         try {
             const client = await getClient();
             const result = await client.query(sql, [powermeter_id, user_id, start_utc, end_utc]);
+            client.release();
             return {
                 status: 200,
                 headers: { 'Content-Type': 'application/json' },

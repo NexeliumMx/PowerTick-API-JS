@@ -82,7 +82,7 @@ app.http('thdCurrentHistory', {
         try {
             const client = await getClient();
             const result = await client.query(query, params);
-
+            client.release(); // Release the client back to the pool
             return {
                 status: 200,
                 headers: { 'Content-Type': 'application/json' },

@@ -161,6 +161,7 @@ app.http('consumptionProfile', {
         try {
             const client = await getClient();
             const result = await client.query(sql, [powermeter_id, user_id, start_utc, end_utc]);
+            client.release(); // Release the client back to the pool
             return {
                 status: 200,
                 headers: { 'Content-Type': 'application/json' },
