@@ -9,7 +9,7 @@
 */
 
 const { app } = require('@azure/functions');
-const { executeQuery } = require('./pgPool');
+const { executeQuery, preWarmPool } = require('./pgPool');
 
 const ALLOWED_ENVIROMENTS = ['public', 'demo', 'dev'];
 
@@ -18,6 +18,11 @@ app.http('fetchRealTimeData', {
     authLevel: 'anonymous',
     handler: async (request, context) => {
         context.log(`Http function processed request for url "${request.url}"`);
+
+        // Trigger background pool pre-warming on cold starts
+        if (process.uptime() < 30) {
+            preWarmPool();
+        }
 
         const userId = request.query.get('user_id');
         const powermeterId = request.query.get('powermeter_id');

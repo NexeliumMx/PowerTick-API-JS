@@ -38,21 +38,21 @@ const { Pool } = require('pg');
 const { DefaultAzureCredential } = require('@azure/identity');
 
 // Constants for configuration (optimized for Azure Functions)
-const CONNECTION_TIMEOUT_MS = 45000; // 45 seconds for Azure cold starts
+const CONNECTION_TIMEOUT_MS = 30000; // Reduced to 30 seconds for faster cold start failures
 const IDLE_TIMEOUT_MS = 300000; // 5 minutes
-const MAX_CONNECTIONS = 10; // Reduced for Azure Functions efficiency
-const MIN_CONNECTIONS = 1; // Reduced minimum for cold starts
-const STATEMENT_TIMEOUT_MS = 60000; // 1 minute
-const QUERY_TIMEOUT_MS = 30000; // 30 seconds (reduced for health checks)
+const MAX_CONNECTIONS = 5; // Further reduced for Azure Functions efficiency
+const MIN_CONNECTIONS = 0; // No minimum connections for cold starts
+const STATEMENT_TIMEOUT_MS = 45000; // Reduced to 45 seconds
+const QUERY_TIMEOUT_MS = 20000; // Reduced to 20 seconds for faster health checks
 const TOKEN_REFRESH_THRESHOLD_MS = 300000; // 5 minutes before expiry
-const MAX_RETRY_ATTEMPTS = 3;
-const INITIAL_RETRY_DELAY_MS = 1000;
-const MAX_RETRY_DELAY_MS = 8000;
+const MAX_RETRY_ATTEMPTS = 2; // Reduced retries for faster failure detection
+const INITIAL_RETRY_DELAY_MS = 500; // Faster initial retry
+const MAX_RETRY_DELAY_MS = 4000; // Reduced max delay
 
-// Circuit breaker configuration (enhanced)
-const CIRCUIT_BREAKER_THRESHOLD = 5; // failures before opening
-const CIRCUIT_BREAKER_TIMEOUT_MS = 60000; // 1 minute
-const CIRCUIT_BREAKER_HALF_OPEN_MAX_CALLS = 3; // Max calls in half-open state
+// Circuit breaker configuration (optimized for Azure Functions)
+const CIRCUIT_BREAKER_THRESHOLD = 3; // Reduced threshold for faster circuit opening
+const CIRCUIT_BREAKER_TIMEOUT_MS = 30000; // Reduced to 30 seconds for faster recovery
+const CIRCUIT_BREAKER_HALF_OPEN_MAX_CALLS = 2; // Reduced max calls in half-open state
 
 // Performance monitoring constants
 const SLOW_QUERY_THRESHOLD_MS = 1000; // Log queries slower than 1 second
@@ -646,16 +646,21 @@ async function end() {
 
 /**
  * Lightweight health check query (bypasses circuit breaker for monitoring)
+ * Optimized for Azure Functions cold starts
  * @returns {Promise<Object>} Query result
  */
 async function healthCheck() {
+    // Fast path: if pool doesn't exist and uptime is low, this is a cold start
+    const isColdStart = process.uptime() < 30;
+    const timeoutMs = isColdStart ? 5000 : 8000; // Shorter timeout for cold starts
+    
     if (!pool) {
-        // Try to initialize pool but don't wait too long
+        // Try to initialize pool with aggressive timeout for cold starts
         try {
             pool = await Promise.race([
                 initPool(),
                 new Promise((_, reject) => 
-                    setTimeout(() => reject(new Error('Pool initialization timeout for health check')), 10000)
+                    setTimeout(() => reject(new Error('Pool initialization timeout for health check')), timeoutMs)
                 )
             ]);
         } catch (error) {
@@ -663,25 +668,35 @@ async function healthCheck() {
         }
     }
     
-    // Use direct pool.query to avoid circuit breaker and retry logic during health checks
+    // Use ultra-lightweight query for health checks
     const startTime = Date.now();
     try {
         const result = await Promise.race([
-            pool.query('SELECT NOW() as current_time'),
+            pool.query('SELECT 1 as alive'), // Minimal query instead of NOW()
             new Promise((_, reject) => 
-                setTimeout(() => reject(new Error('Health check query timeout')), 12000)
+                setTimeout(() => reject(new Error('Health check query timeout')), timeoutMs)
             )
         ]);
         
         const duration = Date.now() - startTime;
-        logWithEnv('info', 'Health check successful', { duration });
+        
+        // Only log on slow responses to reduce noise
+        if (duration > 1000 || isColdStart) {
+            logWithEnv('info', 'Health check completed', { 
+                duration, 
+                isColdStart,
+                threshold: timeoutMs 
+            });
+        }
         
         return result;
     } catch (error) {
         const duration = Date.now() - startTime;
         logWithEnv('error', 'Health check failed', {
             duration,
-            error: error.message
+            error: error.message,
+            isColdStart,
+            threshold: timeoutMs
         });
         throw error;
     }
@@ -700,6 +715,25 @@ function resetCircuitBreaker() {
         timestamp: new Date().toISOString(),
         action: 'manual_reset'
     });
+}
+
+/**
+ * Pre-warm the connection pool in the background (Azure Functions optimization)
+ * This doesn't block the response but starts pool initialization
+ */
+function preWarmPool() {
+    if (!pool && process.uptime() < 30) {
+        logWithEnv('info', 'Starting background pool pre-warming for cold start');
+        
+        // Start pool initialization in background without blocking
+        initPool().then(() => {
+            logWithEnv('info', 'Background pool pre-warming completed');
+        }).catch(error => {
+            logWithEnv('warn', 'Background pool pre-warming failed', { 
+                error: error.message 
+            });
+        });
+    }
 }
 
 // Graceful shutdown handler
@@ -732,5 +766,6 @@ module.exports = {
     // Monitoring and diagnostics
     getPoolMetrics, 
     resetCircuitBreaker,
-    healthCheck       // Lightweight health check for monitoring
+    healthCheck,      // Lightweight health check for monitoring
+    preWarmPool       // Background pool pre-warming for Azure Functions
 };

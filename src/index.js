@@ -6,6 +6,7 @@ app.setup({
 
 // Health and monitoring endpoints
 require('./functions/healthCheck');
+require('./functions/ping');
 require('./functions/testDBconnection');
 require('./functions/resetCircuitBreaker');
 
