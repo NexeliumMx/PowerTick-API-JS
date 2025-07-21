@@ -1,8 +1,8 @@
 /**
  * FileName: src/functions/dbClient.js
- * Author(s): Arturo Vargas
+ * Author(s): Guillermo de Alba, Arturo Vargas
  * Brief: Provides a PostgreSQL connection pool for both local and Azure environments.
- * Date: 2024-11-21
+ * Date: 2025-07-18
  *
  * Description:
  * This module exports a function to obtain a PostgreSQL client from a managed connection pool,
@@ -10,88 +10,550 @@
  * username and password. In Azure, it leverages Managed Identity and token-based authentication
  * via DefaultAzureCredential.
  *
- * Copyright (c) 2024 BY: Nexelium Technological Solutions S.A. de C.V.
+ * Copyright (c) 2025 BY: Nexelium Technological Solutions S.A. de C.V.
  * All rights reserved.
  *
- * ---------------------------------------------------------------------------
- * Code Description:
- * 1. Environment Detection: Determines whether the code is running locally or in Azure based on the ENVIRONMENT variable.
- *
- * 2. Pool Initialization: Initializes a singleton connection pool using the `pg` library. For local, uses standard credentials.
- *    For Azure, retrieves an access token using DefaultAzureCredential and uses it as the password.
- *
- * 3. Pool Reuse: Ensures the pool is only created once and reused for subsequent requests, optimizing resource usage.
- *
- * 4. Client Retrieval: Exports an async `getClient` function that returns a pooled client for executing queries.
- *
- * 5. Configuration: Requires environment variables (`PGHOST`, `PGDATABASE`, `PGPORT`, `PGUSER`, `PGPASSWORD`) to be set.
- *    For Azure, Managed Identity must be configured and the application must have access to the PostgreSQL server.
- * ---------------------------------------------------------------------------
+ * Features:
+ * - Connection pooling with configurable limits and timeouts
+ * - Azure Managed Identity with automatic token refresh
+ * - Exponential backoff retry logic for transient failures
+ * - Circuit breaker pattern for fault tolerance
+ * - Health checks and connection validation
+ * - Comprehensive logging and metrics
+ * - Graceful shutdown handling
  */
 
 const { Pool } = require('pg');
 const { DefaultAzureCredential } = require('@azure/identity');
 
+// Constants for configuration
+const CONNECTION_TIMEOUT_MS = 30000; // 30 seconds
+const IDLE_TIMEOUT_MS = 300000; // 5 minutes
+const MAX_CONNECTIONS = 20; // Maximum pool size
+const MIN_CONNECTIONS = 2; // Minimum pool size
+const STATEMENT_TIMEOUT_MS = 60000; // 1 minute
+const QUERY_TIMEOUT_MS = 45000; // 45 seconds
+const TOKEN_REFRESH_THRESHOLD_MS = 300000; // 5 minutes before expiry
+const MAX_RETRY_ATTEMPTS = 3;
+const INITIAL_RETRY_DELAY_MS = 1000;
+const MAX_RETRY_DELAY_MS = 8000;
+
+// Circuit breaker configuration
+const CIRCUIT_BREAKER_THRESHOLD = 5; // failures before opening
+const CIRCUIT_BREAKER_TIMEOUT_MS = 60000; // 1 minute
+
 let pool;
+let azureCredential;
+let currentToken;
+let tokenExpiryTime;
+let circuitBreakerState = 'CLOSED'; // CLOSED, OPEN, HALF_OPEN
+let circuitBreakerFailureCount = 0;
+let circuitBreakerLastFailureTime = 0;
 
 /**
- * Initializes and returns a singleton PostgreSQL connection pool.
- * Determines the environment (local or Azure) and configures the pool accordingly.
- * For local, uses user/password authentication; for Azure, uses Managed Identity token.
- * @since 1.0.0
- * @return {Promise<Pool>} The initialized PostgreSQL connection pool.
- * @throws {Error} If a valid Azure Managed Identity token cannot be retrieved.
+ * Logs messages with environment tag for observability
+ * @param {string} level - Log level (info, warn, error)
+ * @param {string} message - Log message
+ * @param {Object} metadata - Additional metadata
+ */
+function logWithEnv(level, message, metadata = {}) {
+    const env = process.env.ENVIRONMENT || 'unknown';
+    const logData = {
+        timestamp: new Date().toISOString(),
+        level,
+        message,
+        env,
+        service: 'postgresql-client',
+        ...metadata
+    };
+    
+    console[level](JSON.stringify(logData));
+}
+
+/**
+ * Implements exponential backoff for retry logic
+ * @param {number} attempt - Current attempt number (0-based)
+ * @returns {number} Delay in milliseconds
+ */
+function calculateRetryDelay(attempt) {
+    const delay = Math.min(
+        INITIAL_RETRY_DELAY_MS * Math.pow(2, attempt),
+        MAX_RETRY_DELAY_MS
+    );
+    // Add jitter to prevent thundering herd
+    return delay + Math.random() * 1000;
+}
+
+/**
+ * Checks if an error is retryable
+ * @param {Error} error - The error to check
+ * @returns {boolean} True if the error is retryable
+ */
+function isRetryableError(error) {
+    if (!error) return false;
+    
+    const retryableCodes = [
+        'ECONNRESET',
+        'ECONNREFUSED', 
+        'ETIMEDOUT',
+        'ENOTFOUND',
+        'EAI_AGAIN'
+    ];
+    
+    const retryableMessages = [
+        'connection terminated',
+        'connection closed',
+        'server closed the connection',
+        'timeout expired',
+        'too many clients'
+    ];
+    
+    return retryableCodes.includes(error.code) ||
+           retryableMessages.some(msg => error.message?.toLowerCase().includes(msg));
+}
+
+/**
+ * Circuit breaker implementation
+ */
+const circuitBreaker = {
+    recordSuccess() {
+        circuitBreakerFailureCount = 0;
+        if (circuitBreakerState === 'HALF_OPEN') {
+            circuitBreakerState = 'CLOSED';
+            logWithEnv('info', 'Circuit breaker closed after successful operation');
+        }
+    },
+    
+    recordFailure() {
+        circuitBreakerFailureCount++;
+        circuitBreakerLastFailureTime = Date.now();
+        
+        if (circuitBreakerFailureCount >= CIRCUIT_BREAKER_THRESHOLD) {
+            circuitBreakerState = 'OPEN';
+            logWithEnv('warn', 'Circuit breaker opened due to consecutive failures', {
+                failureCount: circuitBreakerFailureCount
+            });
+        }
+    },
+    
+    canExecute() {
+        if (circuitBreakerState === 'CLOSED') return true;
+        
+        if (circuitBreakerState === 'OPEN') {
+            const timeSinceLastFailure = Date.now() - circuitBreakerLastFailureTime;
+            if (timeSinceLastFailure >= CIRCUIT_BREAKER_TIMEOUT_MS) {
+                circuitBreakerState = 'HALF_OPEN';
+                logWithEnv('info', 'Circuit breaker moved to half-open state');
+                return true;
+            }
+            return false;
+        }
+        
+        return circuitBreakerState === 'HALF_OPEN';
+    }
+};
+
+/**
+ * Retrieves and caches Azure access token with automatic refresh
+ * @returns {Promise<string>} Valid access token
+ */
+async function getAzureToken() {
+    const now = Date.now();
+    
+    // Return cached token if still valid
+    if (currentToken && tokenExpiryTime && now < (tokenExpiryTime - TOKEN_REFRESH_THRESHOLD_MS)) {
+        return currentToken;
+    }
+    
+    if (!azureCredential) {
+        azureCredential = new DefaultAzureCredential({
+            managedIdentityClientId: process.env.AZURE_CLIENT_ID // Optional: specify client ID
+        });
+    }
+    
+    logWithEnv('info', 'Requesting new Azure access token');
+    
+    try {
+        const tokenResponse = await azureCredential.getToken('https://ossrdbms-aad.database.windows.net');
+        
+        if (!tokenResponse?.token) {
+            throw new Error('Invalid token response from Azure Managed Identity');
+        }
+        
+        currentToken = tokenResponse.token;
+        tokenExpiryTime = tokenResponse.expiresOnTimestamp;
+        
+        logWithEnv('info', 'Azure access token retrieved successfully', {
+            expiresAt: new Date(tokenExpiryTime).toISOString()
+        });
+        
+        return currentToken;
+    } catch (error) {
+        logWithEnv('error', 'Failed to retrieve Azure access token', {
+            error: error.message,
+            stack: error.stack
+        });
+        throw new Error(`Azure authentication failed: ${error.message}`);
+    }
+}
+
+/**
+ * Creates pool configuration based on environment
+ * @returns {Promise<Object>} Pool configuration object
+ */
+async function createPoolConfig() {
+    const isLocal = process.env.ENVIRONMENT === 'local';
+    
+    const baseConfig = {
+        host: process.env.PGHOST,
+        database: process.env.PGDATABASE,
+        port: parseInt(process.env.PGPORT) || 5432,
+        user: process.env.PGUSER,
+        
+        // Connection pool settings
+        max: MAX_CONNECTIONS,
+        min: MIN_CONNECTIONS,
+        idleTimeoutMillis: IDLE_TIMEOUT_MS,
+        connectionTimeoutMillis: CONNECTION_TIMEOUT_MS,
+        
+        // Query settings
+        statement_timeout: STATEMENT_TIMEOUT_MS,
+        query_timeout: QUERY_TIMEOUT_MS,
+        
+        // SSL configuration
+        ssl: {
+            rejectUnauthorized: false,
+            // In production, consider setting rejectUnauthorized: true with proper CA
+        },
+        
+        // Application name for monitoring
+        application_name: `powertick-api-${process.env.ENVIRONMENT || 'unknown'}`,
+        
+        // Enable keep alive
+        keepAlive: true,
+        keepAliveInitialDelayMillis: 10000,
+        
+        // Connection validation
+        parseInputDatesAsUTC: true,
+    };
+    
+    if (isLocal) {
+        logWithEnv('info', 'Configuring pool for local development');
+        return {
+            ...baseConfig,
+            password: process.env.PGPASSWORD
+        };
+    } else {
+        logWithEnv('info', 'Configuring pool for Azure with Managed Identity');
+        const token = await getAzureToken();
+        return {
+            ...baseConfig,
+            password: token
+        };
+    }
+}
+
+/**
+ * Validates pool health and connectivity
+ * @returns {Promise<boolean>} True if pool is healthy
+ */
+async function validatePoolHealth() {
+    if (!pool) return false;
+    
+    try {
+        const client = await pool.connect();
+        await client.query('SELECT 1');
+        client.release();
+        return true;
+    } catch (error) {
+        logWithEnv('warn', 'Pool health check failed', {
+            error: error.message
+        });
+        return false;
+    }
+}
+
+/**
+ * Initializes connection pool with retry logic and error handling
+ * @returns {Promise<Pool>} Initialized PostgreSQL connection pool
  */
 async function initPool() {
     if (pool) {
-        console.log("Reusing existing connection pool.");
-        return pool;  // Reuse the existing pool if already created
-    }
-
-    if (process.env.ENVIRONMENT === "local") {
-        console.log("Running locally. Using traditional user/password authentication.");
-        pool = new Pool({
-            host: process.env.PGHOST,
-            database: process.env.PGDATABASE,
-            port: process.env.PGPORT || 5432,
-            ssl: { rejectUnauthorized: false },
-            user: process.env.PGUSER,
-            password: process.env.PGPASSWORD
-        });
-    } else {
-        console.log("Running in Azure. Using token-based authentication with managed identity.");
-        const credential = new DefaultAzureCredential();
-        const tokenResponse = await credential.getToken("https://ossrdbms-aad.database.windows.net");
-
-        if (!tokenResponse || typeof tokenResponse.token !== 'string') {
-            console.error("Failed to retrieve a valid token.");
-            throw new Error("Invalid token retrieved from Azure Managed Identity.");
+        // Validate existing pool health
+        const isHealthy = await validatePoolHealth();
+        if (isHealthy) {
+            logWithEnv('info', 'Reusing existing healthy connection pool');
+            return pool;
+        } else {
+            logWithEnv('warn', 'Existing pool unhealthy, recreating...');
+            await destroyPool();
         }
-
-        pool = new Pool({
-            host: process.env.PGHOST,
-            database: process.env.PGDATABASE,
-            port: process.env.PGPORT || 5432,
-            ssl: { rejectUnauthorized: false },
-            user: process.env.PGUSER,
-            password: tokenResponse.token
-        });
     }
-
-    console.log("Connection pool initialized.");
-    return pool;
+    
+    let lastError;
+    
+    for (let attempt = 0; attempt < MAX_RETRY_ATTEMPTS; attempt++) {
+        try {
+            logWithEnv('info', 'Initializing PostgreSQL connection pool', {
+                attempt: attempt + 1,
+                maxAttempts: MAX_RETRY_ATTEMPTS
+            });
+            
+            const config = await createPoolConfig();
+            pool = new Pool(config);
+            
+            // Set up pool event handlers
+            pool.on('connect', (client) => {
+                logWithEnv('info', 'New client connected to pool', {
+                    totalCount: pool.totalCount,
+                    idleCount: pool.idleCount,
+                    waitingCount: pool.waitingCount
+                });
+            });
+            
+            pool.on('remove', (client) => {
+                logWithEnv('info', 'Client removed from pool', {
+                    totalCount: pool.totalCount,
+                    idleCount: pool.idleCount
+                });
+            });
+            
+            pool.on('error', (err, client) => {
+                logWithEnv('error', 'Pool error occurred', {
+                    error: err.message,
+                    stack: err.stack,
+                    totalCount: pool.totalCount,
+                    idleCount: pool.idleCount
+                });
+                circuitBreaker.recordFailure();
+            });
+            
+            // Test the connection
+            const testClient = await pool.connect();
+            await testClient.query('SELECT NOW() as current_time, version() as pg_version');
+            testClient.release();
+            
+            logWithEnv('info', 'PostgreSQL connection pool initialized successfully', {
+                maxConnections: MAX_CONNECTIONS,
+                minConnections: MIN_CONNECTIONS,
+                environment: process.env.ENVIRONMENT || 'unknown'
+            });
+            
+            circuitBreaker.recordSuccess();
+            return pool;
+            
+        } catch (error) {
+            lastError = error;
+            circuitBreaker.recordFailure();
+            
+            logWithEnv('error', 'Failed to initialize connection pool', {
+                attempt: attempt + 1,
+                error: error.message,
+                stack: error.stack
+            });
+            
+            if (attempt < MAX_RETRY_ATTEMPTS - 1 && isRetryableError(error)) {
+                const delay = calculateRetryDelay(attempt);
+                logWithEnv('info', `Retrying pool initialization in ${delay}ms`);
+                await new Promise(resolve => setTimeout(resolve, delay));
+            }
+        }
+    }
+    
+    logWithEnv('error', 'Failed to initialize connection pool after all attempts', {
+        attempts: MAX_RETRY_ATTEMPTS,
+        lastError: lastError.message
+    });
+    
+    throw new Error(`Connection pool initialization failed: ${lastError.message}`);
 }
 
 /**
- * Fetches a PostgreSQL client from the connection pool for executing queries.
- * Ensures the pool is initialized before returning a client.
- * @since 1.0.0
- * @return {Promise<import('pg').PoolClient>} A pooled PostgreSQL client.
+ * Safely destroys the connection pool
  */
-async function getClient() {
-    const pool = await initPool();
-    console.log("Fetching a client from the pool.");
-    return pool.connect(); // Returns a pooled client
+async function destroyPool() {
+    if (pool) {
+        try {
+            logWithEnv('info', 'Destroying connection pool');
+            await pool.end();
+            pool = null;
+            logWithEnv('info', 'Connection pool destroyed successfully');
+        } catch (error) {
+            logWithEnv('error', 'Error destroying connection pool', {
+                error: error.message
+            });
+        }
+    }
 }
 
-module.exports = { getClient };
+/**
+ * Gets a client from the connection pool with comprehensive error handling
+ * @returns {Promise<import('pg').PoolClient>} Database client
+ */
+async function getClient() {
+    // Check circuit breaker
+    if (!circuitBreaker.canExecute()) {
+        const error = new Error('Circuit breaker is open - database operations temporarily disabled');
+        logWithEnv('warn', 'Request blocked by circuit breaker');
+        throw error;
+    }
+    
+    try {
+        // Ensure pool is initialized
+        const activePool = await initPool();
+        
+        logWithEnv('info', 'Acquiring client from pool', {
+            totalCount: activePool.totalCount,
+            idleCount: activePool.idleCount,
+            waitingCount: activePool.waitingCount
+        });
+        
+        // Get client with timeout
+        const client = await Promise.race([
+            activePool.connect(),
+            new Promise((_, reject) => 
+                setTimeout(() => reject(new Error('Client acquisition timeout')), CONNECTION_TIMEOUT_MS)
+            )
+        ]);
+        
+        // Enhance client with custom methods
+        const originalRelease = client.release.bind(client);
+        client.release = (err) => {
+            if (err) {
+                logWithEnv('error', 'Client released with error', {
+                    error: err.message
+                });
+                circuitBreaker.recordFailure();
+            } else {
+                logWithEnv('info', 'Client released successfully');
+                circuitBreaker.recordSuccess();
+            }
+            originalRelease(err);
+        };
+        
+        // Add query timeout wrapper
+        const originalQuery = client.query.bind(client);
+        client.query = async (...args) => {
+            const startTime = Date.now();
+            try {
+                const result = await Promise.race([
+                    originalQuery(...args),
+                    new Promise((_, reject) => 
+                        setTimeout(() => reject(new Error('Query timeout')), QUERY_TIMEOUT_MS)
+                    )
+                ]);
+                
+                const duration = Date.now() - startTime;
+                logWithEnv('info', 'Query executed successfully', {
+                    duration,
+                    rowCount: result.rowCount
+                });
+                
+                return result;
+            } catch (error) {
+                const duration = Date.now() - startTime;
+                logWithEnv('error', 'Query failed', {
+                    duration,
+                    error: error.message,
+                    query: args[0]?.substring(0, 100) + '...' // Log first 100 chars of query
+                });
+                throw error;
+            }
+        };
+        
+        return client;
+        
+    } catch (error) {
+        circuitBreaker.recordFailure();
+        logWithEnv('error', 'Failed to acquire database client', {
+            error: error.message,
+            stack: error.stack
+        });
+        throw error;
+    }
+}
+
+/**
+ * Executes a query with automatic retry logic and connection management
+ * @param {string} query - SQL query
+ * @param {Array} params - Query parameters
+ * @returns {Promise<Object>} Query result
+ */
+async function executeQuery(query, params = []) {
+    let client;
+    let lastError;
+    
+    for (let attempt = 0; attempt < MAX_RETRY_ATTEMPTS; attempt++) {
+        try {
+            client = await getClient();
+            const result = await client.query(query, params);
+            client.release();
+            return result;
+            
+        } catch (error) {
+            lastError = error;
+            
+            if (client) {
+                client.release(error);
+                client = null;
+            }
+            
+            if (attempt < MAX_RETRY_ATTEMPTS - 1 && isRetryableError(error)) {
+                const delay = calculateRetryDelay(attempt);
+                logWithEnv('warn', `Query failed, retrying in ${delay}ms`, {
+                    attempt: attempt + 1,
+                    error: error.message
+                });
+                await new Promise(resolve => setTimeout(resolve, delay));
+            } else {
+                break;
+            }
+        }
+    }
+    
+    throw lastError;
+}
+
+/**
+ * Gets connection pool metrics for monitoring
+ * @returns {Object} Pool metrics
+ */
+function getPoolMetrics() {
+    if (!pool) {
+        return {
+            status: 'not_initialized',
+            totalCount: 0,
+            idleCount: 0,
+            waitingCount: 0
+        };
+    }
+    
+    return {
+        status: 'initialized',
+        totalCount: pool.totalCount,
+        idleCount: pool.idleCount,
+        waitingCount: pool.waitingCount,
+        circuitBreakerState,
+        circuitBreakerFailureCount
+    };
+}
+
+// Graceful shutdown handler
+process.on('SIGTERM', async () => {
+    logWithEnv('info', 'Received SIGTERM, shutting down gracefully');
+    await destroyPool();
+    process.exit(0);
+});
+
+process.on('SIGINT', async () => {
+    logWithEnv('info', 'Received SIGINT, shutting down gracefully');
+    await destroyPool();
+    process.exit(0);
+});
+
+module.exports = { 
+    getClient, 
+    executeQuery, 
+    getPoolMetrics, 
+    destroyPool 
+};

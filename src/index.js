@@ -4,6 +4,9 @@ app.setup({
     enableHttpStream: true,
 });
 
+// Health check endpoint
+require('./functions/healthCheck');
+
 // Import all Analysis Endpoints
 require('./functions/Analysis Endpoints/consumptionHistory');
 require('./functions/Analysis Endpoints/consumptionProfile');
