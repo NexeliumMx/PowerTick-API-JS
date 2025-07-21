@@ -14,7 +14,7 @@
  */
 
 const { app } = require('@azure/functions');
-const { executeQuery } = require('../dbClient');
+const { executeQuery } = require('../pgPool');
 
 const ALLOWED_ENVIROMENTS = ['production', 'demo', 'dev'];
 

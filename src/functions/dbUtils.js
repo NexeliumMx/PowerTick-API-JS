@@ -12,7 +12,7 @@
  * All rights reserved.
  */
 
-const { getClient, executeQuery } = require('./dbClient');
+const { getClient, executeQuery } = require('./pgPool');
 
 // Constants following coding instructions
 const ALLOWED_ENVIRONMENTS = ['production', 'demo', 'dev'];

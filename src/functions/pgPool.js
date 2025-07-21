@@ -1,26 +1,37 @@
 /**
- * FileName: src/functions/dbClient.js
- * Author(s): Guillermo de Alba, Arturo Vargas
- * Brief: Provides a PostgreSQL connection pool for both local and Azure environments.
+ * FileName: src/functions/pgPool.js
+ * Author(s): Arturo Vargas
+ * Brief: PostgreSQL connection pool manager for both local and Azure environments.
  * Date: 2025-07-18
  *
  * Description:
- * This module exports a function to obtain a PostgreSQL client from a managed connection pool,
- * supporting both local development and Azure deployments. For local use, it authenticates with
- * username and password. In Azure, it leverages Managed Identity and token-based authentication
- * via DefaultAzureCredential.
+ * This module provides a comprehensive PostgreSQL connection pool with enterprise features
+ * including circuit breaker, retry logic, Azure Managed Identity, performance monitoring,
+ * and automatic connection management for both local development and Azure deployments.
+ * 
+ * Implements the complete Node.js pg (node-postgres) API with enhanced enterprise features.
  *
  * Copyright (c) 2025 BY: Nexelium Technological Solutions S.A. de C.V.
  * All rights reserved.
  *
  * Features:
- * - Connection pooling with configurable limits and timeouts
- * - Azure Managed Identity with automatic token refresh
+ * - Enterprise-grade connection pooling with configurable limits and timeouts
+ * - Azure Managed Identity with automatic token refresh and caching
  * - Exponential backoff retry logic for transient failures
- * - Circuit breaker pattern for fault tolerance
+ * - Circuit breaker pattern for fault tolerance and system protection
  * - Health checks and connection validation
- * - Comprehensive logging and metrics
- * - Graceful shutdown handling
+ * - Comprehensive logging and performance metrics with environment tagging
+ * - Graceful shutdown handling and resource cleanup
+ * - Full Node-Postgres API compliance with enhanced features
+ * 
+ * Standard Node.js pg API Methods:
+ * - pool.query(text, values) -> query(text, values) - Single query execution
+ * - pool.connect() -> connect() - Manual client checkout (must call client.release())
+ * - pool.end() -> end() - Graceful pool shutdown
+ * 
+ * Enhanced Methods (Recommended):
+ * - executeQuery(text, values) - Query with retry logic and circuit breaker
+ * - getClient() - Enhanced client with timeout and error handling
  */
 
 const { Pool } = require('pg');
@@ -223,6 +234,10 @@ async function createPoolConfig() {
         idleTimeoutMillis: IDLE_TIMEOUT_MS,
         connectionTimeoutMillis: CONNECTION_TIMEOUT_MS,
         
+        // Additional pool configuration for production reliability
+        allowExitOnIdle: process.env.ENVIRONMENT === 'local', // Allow exit in local/testing
+        maxLifetimeSeconds: 3600, // Rotate connections every hour for security
+        
         // Performance optimized query settings
         statement_timeout: STATEMENT_TIMEOUT_MS,
         query_timeout: QUERY_TIMEOUT_MS,
@@ -325,6 +340,30 @@ async function initPool() {
                     idleCount: pool.idleCount
                 });
                 circuitBreaker.recordFailure();
+            });
+            
+            // Additional event handlers for complete coverage
+            pool.on('acquire', (client) => {
+                logWithEnv('info', 'Client acquired from pool', {
+                    totalCount: pool.totalCount,
+                    idleCount: pool.idleCount,
+                    waitingCount: pool.waitingCount
+                });
+            });
+            
+            pool.on('release', (err, client) => {
+                if (err) {
+                    logWithEnv('warn', 'Client released with error', {
+                        error: err.message,
+                        totalCount: pool.totalCount,
+                        idleCount: pool.idleCount
+                    });
+                } else {
+                    logWithEnv('info', 'Client released back to pool', {
+                        totalCount: pool.totalCount,
+                        idleCount: pool.idleCount
+                    });
+                }
             });
             
             // Test the connection
@@ -542,6 +581,70 @@ function getPoolMetrics() {
 }
 
 /**
+ * Direct pool.query method for simple queries (official node-postgres API)
+ * This is the standard node-postgres pattern: pool.query() for single queries
+ * Note: This bypasses circuit breaker and retry logic. Use executeQuery() for enhanced features.
+ * @param {string} text - SQL query
+ * @param {Array} values - Query parameters
+ * @returns {Promise<Object>} Query result
+ */
+async function query(text, values = []) {
+    if (!pool) {
+        pool = await initPool();
+    }
+    
+    const startTime = Date.now();
+    try {
+        const result = await pool.query(text, values);
+        const duration = Date.now() - startTime;
+        
+        if (duration > SLOW_QUERY_THRESHOLD_MS) {
+            logWithEnv('warn', 'Slow query detected via pool.query', {
+                duration,
+                query: text.substring(0, 100) + '...'
+            });
+        }
+        
+        return result;
+    } catch (error) {
+        const duration = Date.now() - startTime;
+        logWithEnv('error', 'Pool query failed', {
+            duration,
+            error: error.message,
+            query: text.substring(0, 100) + '...'
+        });
+        throw error;
+    }
+}
+
+/**
+ * Get a client from the pool (standard node-postgres pattern)
+ * Important: You MUST call client.release() when done to return the client to the pool
+ * @returns {Promise<import('pg').PoolClient>} Database client that must be released
+ */
+async function connect() {
+    if (!pool) {
+        pool = await initPool();
+    }
+    
+    return await pool.connect();
+}
+
+/**
+ * End the pool (standard node-postgres pattern)
+ * This will drain the pool and close all connections
+ * @returns {Promise<void>}
+ */
+async function end() {
+    if (pool) {
+        logWithEnv('info', 'Ending connection pool');
+        await pool.end();
+        pool = null;
+        logWithEnv('info', 'Connection pool ended successfully');
+    }
+}
+
+/**
  * Manually resets the circuit breaker (for emergency recovery)
  * @returns {void}
  */
@@ -570,9 +673,20 @@ process.on('SIGINT', async () => {
 });
 
 module.exports = { 
+    // Enhanced methods with circuit breaker and retry logic (recommended)
     getClient, 
-    executeQuery, 
+    executeQuery,
+    
+    // Standard node-postgres API methods (official patterns)
+    query,            // pool.query() - for single queries without transaction
+    connect,          // pool.connect() - manual client checkout (remember to release!)
+    end,              // pool.end() - shutdown the pool
+    
+    // Legacy/alias methods for backward compatibility
+    poolQuery: query, // Alias for query method
+    destroyPool: end, // Alias for end method
+    
+    // Monitoring and diagnostics
     getPoolMetrics, 
-    destroyPool,
     resetCircuitBreaker
 };

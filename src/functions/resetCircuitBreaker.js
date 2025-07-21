@@ -10,7 +10,7 @@
  */
 
 const { app } = require('@azure/functions');
-const { resetCircuitBreaker, getPoolMetrics, executeQuery } = require('./dbClient');
+const { resetCircuitBreaker, getPoolMetrics, executeQuery } = require('./pgPool');
 const { createApiResponse, HTTP_STATUS_OK, HTTP_STATUS_INTERNAL_ERROR } = require('./dbUtils');
 
 /**

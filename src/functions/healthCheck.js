@@ -10,7 +10,7 @@
  */
 
 const { app } = require('@azure/functions');
-const { getPoolMetrics, executeQuery } = require('./dbClient');
+const { getPoolMetrics, executeQuery } = require('./pgPool');
 const { createApiResponse, HTTP_STATUS_OK, HTTP_STATUS_SERVICE_UNAVAILABLE } = require('./dbUtils');
 
 // Constants following coding instructions

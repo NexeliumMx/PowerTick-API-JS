@@ -10,7 +10,7 @@
  */
 
 const { app } = require('@azure/functions');
-const { executeQuery } = require('./dbClient');
+const { executeQuery } = require('./pgPool');
 const { Parser } = require('json2csv');
 
 const ALLOWED_ENVIRONMENTS = ['production', 'demo', 'dev'];

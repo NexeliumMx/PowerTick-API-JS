@@ -10,7 +10,7 @@
  */
 
 const { app } = require('@azure/functions');
-const { executeQuery } = require('./dbClient');
+const { executeQuery } = require('./pgPool');
 
 app.http('supportedTimeZones', {
     methods: ['GET'],

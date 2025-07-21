@@ -9,7 +9,7 @@
  */
 
 const { app } = require('@azure/functions');
-const { executeQuery } = require('./dbClient');
+const { executeQuery } = require('./pgPool');
 const fs = require('fs');
 const path = require('path');
 
