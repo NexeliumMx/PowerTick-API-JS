@@ -1,46 +1,24 @@
 /**
  * FileName: src/functions/pgPool.js
- * Author(s): Arturo Vargas
+ * Author(s): Guillermo de Alba, Arturo Vargas
  * Brief: PostgreSQL connection pool manager for both local and Azure environments.
  * Date: 2025-07-18
  *
  * Description:
- * This module provides a comprehensive PostgreSQL connection pool with enterprise features
- * including circuit breaker, retry logic, Azure Managed Identity, performance monitoring,
- * and automatic connection management for both local development and Azure deployments.
- * 
- * Implements the complete Node.js pg (node-postgres) API with enhanced enterprise features.
+ * This module provides a PostgreSQL connection pool with circuit breaker, retry logic, Azure Managed Identity,
+ * performance monitoring, and automatic connection management for both local development and Azure deployments.
  *
  * Copyright (c) 2025 BY: Nexelium Technological Solutions S.A. de C.V.
  * All rights reserved.
- *
- * Features:
- * - Enterprise-grade connection pooling with configurable limits and timeouts
- * - Azure Managed Identity with automatic token refresh and caching
- * - Exponential backoff retry logic for transient failures
- * - Circuit breaker pattern for fault tolerance and system protection
- * - Health checks and connection validation
- * - Comprehensive logging and performance metrics with environment tagging
- * - Graceful shutdown handling and resource cleanup
- * - Full Node-Postgres API compliance with enhanced features
- * 
- * Standard Node.js pg API Methods:
- * - pool.query(text, values) -> query(text, values) - Single query execution
- * - pool.connect() -> connect() - Manual client checkout (must call client.release())
- * - pool.end() -> end() - Graceful pool shutdown
- * 
- * Enhanced Methods (Recommended):
- * - executeQuery(text, values) - Query with retry logic and circuit breaker
- * - getClient() - Enhanced client with timeout and error handling
  */
 
 const { Pool } = require('pg');
 const { DefaultAzureCredential } = require('@azure/identity');
 
-// Constants for configuration (optimized for Azure Functions)
+// Constants for configuration
 const CONNECTION_TIMEOUT_MS = 30000; // Reduced to 30 seconds for faster cold start failures
 const IDLE_TIMEOUT_MS = 300000; // 5 minutes
-const MAX_CONNECTIONS = 5; // Further reduced for Azure Functions efficiency
+const MAX_CONNECTIONS = 5; // Reduced to 5 for better resource management in Azure Functions
 const MIN_CONNECTIONS = 0; // No minimum connections for cold starts
 const STATEMENT_TIMEOUT_MS = 45000; // Reduced to 45 seconds
 const QUERY_TIMEOUT_MS = 20000; // Reduced to 20 seconds for faster health checks
@@ -49,7 +27,7 @@ const MAX_RETRY_ATTEMPTS = 2; // Reduced retries for faster failure detection
 const INITIAL_RETRY_DELAY_MS = 500; // Faster initial retry
 const MAX_RETRY_DELAY_MS = 4000; // Reduced max delay
 
-// Circuit breaker configuration (optimized for Azure Functions)
+// Circuit breaker configuration
 const CIRCUIT_BREAKER_THRESHOLD = 3; // Reduced threshold for faster circuit opening
 const CIRCUIT_BREAKER_TIMEOUT_MS = 30000; // Reduced to 30 seconds for faster recovery
 const CIRCUIT_BREAKER_HALF_OPEN_MAX_CALLS = 2; // Reduced max calls in half-open state
@@ -216,7 +194,7 @@ async function getAzureToken() {
 }
 
 /**
- * Creates pool configuration based on environment (performance optimized)
+ * Creates pool configuration based on environment
  * @returns {Promise<Object>} Pool configuration object
  */
 async function createPoolConfig() {
@@ -581,9 +559,7 @@ function getPoolMetrics() {
 }
 
 /**
- * Direct pool.query method for simple queries (official node-postgres API)
- * This is the standard node-postgres pattern: pool.query() for single queries
- * Note: This bypasses circuit breaker and retry logic. Use executeQuery() for enhanced features.
+ * Direct pool.query method for simple queries
  * @param {string} text - SQL query
  * @param {Array} values - Query parameters
  * @returns {Promise<Object>} Query result
@@ -619,7 +595,6 @@ async function query(text, values = []) {
 
 /**
  * Get a client from the pool (standard node-postgres pattern)
- * Important: You MUST call client.release() when done to return the client to the pool
  * @returns {Promise<import('pg').PoolClient>} Database client that must be released
  */
 async function connect() {
@@ -750,20 +725,18 @@ process.on('SIGINT', async () => {
 });
 
 module.exports = { 
-    // Enhanced methods with circuit breaker and retry logic (recommended)
     getClient, 
     executeQuery,
     
-    // Standard node-postgres API methods (official patterns)
     query,            // pool.query() - for single queries without transaction
     connect,          // pool.connect() - manual client checkout (remember to release!)
     end,              // pool.end() - shutdown the pool
     
-    // Legacy/alias methods for backward compatibility
+    
     poolQuery: query, // Alias for query method
     destroyPool: end, // Alias for end method
     
-    // Monitoring and diagnostics
+    
     getPoolMetrics, 
     resetCircuitBreaker,
     healthCheck,      // Lightweight health check for monitoring
