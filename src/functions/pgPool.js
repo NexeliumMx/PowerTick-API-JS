@@ -37,13 +37,13 @@
 const { Pool } = require('pg');
 const { DefaultAzureCredential } = require('@azure/identity');
 
-// Constants for configuration (performance optimized)
-const CONNECTION_TIMEOUT_MS = 30000; // 30 seconds
+// Constants for configuration (optimized for Azure Functions)
+const CONNECTION_TIMEOUT_MS = 45000; // 45 seconds for Azure cold starts
 const IDLE_TIMEOUT_MS = 300000; // 5 minutes
-const MAX_CONNECTIONS = 20; // Maximum pool size
-const MIN_CONNECTIONS = 2; // Minimum pool size
+const MAX_CONNECTIONS = 10; // Reduced for Azure Functions efficiency
+const MIN_CONNECTIONS = 1; // Reduced minimum for cold starts
 const STATEMENT_TIMEOUT_MS = 60000; // 1 minute
-const QUERY_TIMEOUT_MS = 45000; // 45 seconds
+const QUERY_TIMEOUT_MS = 30000; // 30 seconds (reduced for health checks)
 const TOKEN_REFRESH_THRESHOLD_MS = 300000; // 5 minutes before expiry
 const MAX_RETRY_ATTEMPTS = 3;
 const INITIAL_RETRY_DELAY_MS = 1000;
@@ -645,6 +645,49 @@ async function end() {
 }
 
 /**
+ * Lightweight health check query (bypasses circuit breaker for monitoring)
+ * @returns {Promise<Object>} Query result
+ */
+async function healthCheck() {
+    if (!pool) {
+        // Try to initialize pool but don't wait too long
+        try {
+            pool = await Promise.race([
+                initPool(),
+                new Promise((_, reject) => 
+                    setTimeout(() => reject(new Error('Pool initialization timeout for health check')), 10000)
+                )
+            ]);
+        } catch (error) {
+            throw new Error(`Health check failed - pool initialization: ${error.message}`);
+        }
+    }
+    
+    // Use direct pool.query to avoid circuit breaker and retry logic during health checks
+    const startTime = Date.now();
+    try {
+        const result = await Promise.race([
+            pool.query('SELECT NOW() as current_time'),
+            new Promise((_, reject) => 
+                setTimeout(() => reject(new Error('Health check query timeout')), 12000)
+            )
+        ]);
+        
+        const duration = Date.now() - startTime;
+        logWithEnv('info', 'Health check successful', { duration });
+        
+        return result;
+    } catch (error) {
+        const duration = Date.now() - startTime;
+        logWithEnv('error', 'Health check failed', {
+            duration,
+            error: error.message
+        });
+        throw error;
+    }
+}
+
+/**
  * Manually resets the circuit breaker (for emergency recovery)
  * @returns {void}
  */
@@ -688,5 +731,6 @@ module.exports = {
     
     // Monitoring and diagnostics
     getPoolMetrics, 
-    resetCircuitBreaker
+    resetCircuitBreaker,
+    healthCheck       // Lightweight health check for monitoring
 };

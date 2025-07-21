@@ -10,11 +10,11 @@
  */
 
 const { app } = require('@azure/functions');
-const { getPoolMetrics, executeQuery } = require('./pgPool');
+const { getPoolMetrics, healthCheck } = require('./pgPool');
 const { createApiResponse, HTTP_STATUS_OK, HTTP_STATUS_SERVICE_UNAVAILABLE } = require('./dbUtils');
 
 // Constants following coding instructions
-const HEALTH_CHECK_TIMEOUT_MS = 5000;
+const HEALTH_CHECK_TIMEOUT_MS = 15000; // Increased to 15 seconds for Azure cold starts
 const HEALTH_STATUS_HEALTHY = 'healthy';
 const HEALTH_STATUS_UNHEALTHY = 'unhealthy';
 const HEALTH_STATUS_DEGRADED = 'degraded';
@@ -35,21 +35,32 @@ async function healthCheckHandler(request, context) {
             responseTime: 0
         };
 
-        // Check 2: Database connectivity
+        // Check 2: Database connectivity with graceful degradation
         try {
             const dbStartTime = Date.now();
-            await Promise.race([
-                executeQuery('SELECT NOW() as current_time, version() as db_version'),
+            const dbResult = await Promise.race([
+                healthCheck(), // Use lightweight health check method
                 new Promise((_, reject) => 
                     setTimeout(() => reject(new Error('Database health check timeout')), HEALTH_CHECK_TIMEOUT_MS)
                 )
             ]);
             
+            const responseTime = Date.now() - dbStartTime;
             checks.database = {
                 status: HEALTH_STATUS_HEALTHY,
-                responseTime: Date.now() - dbStartTime,
+                responseTime,
                 timestamp: new Date().toISOString()
             };
+            
+            // If response time is slow but successful, mark as degraded
+            if (responseTime > 3000) {
+                checks.database.status = HEALTH_STATUS_DEGRADED;
+                checks.database.warning = 'Slow database response time';
+                if (overallStatus === HEALTH_STATUS_HEALTHY) {
+                    overallStatus = HEALTH_STATUS_DEGRADED;
+                }
+            }
+            
         } catch (error) {
             checks.database = {
                 status: HEALTH_STATUS_UNHEALTHY,
@@ -59,19 +70,30 @@ async function healthCheckHandler(request, context) {
             overallStatus = HEALTH_STATUS_UNHEALTHY;
         }
 
-        // Check 3: Connection pool metrics
+        // Check 3: Connection pool metrics with better status logic
         const poolMetrics = getPoolMetrics();
+        let poolStatus = HEALTH_STATUS_HEALTHY;
+        
+        if (poolMetrics.status !== 'initialized') {
+            // If database is healthy but pool not initialized, it's starting up (degraded)
+            poolStatus = checks.database.status === HEALTH_STATUS_HEALTHY ? HEALTH_STATUS_DEGRADED : HEALTH_STATUS_UNHEALTHY;
+        } else if (poolMetrics.circuitBreakerState === 'OPEN') {
+            poolStatus = HEALTH_STATUS_UNHEALTHY;
+        } else if (poolMetrics.circuitBreakerState === 'HALF_OPEN') {
+            poolStatus = HEALTH_STATUS_DEGRADED;
+        }
+        
         checks.connectionPool = {
-            status: poolMetrics.status === 'initialized' ? HEALTH_STATUS_HEALTHY : HEALTH_STATUS_UNHEALTHY,
+            status: poolStatus,
             metrics: poolMetrics,
             timestamp: new Date().toISOString()
         };
 
-        if (poolMetrics.status !== 'initialized') {
+        // Update overall status based on pool status
+        if (poolStatus === HEALTH_STATUS_UNHEALTHY && overallStatus !== HEALTH_STATUS_UNHEALTHY) {
             overallStatus = HEALTH_STATUS_UNHEALTHY;
-        } else if (poolMetrics.circuitBreakerState !== 'CLOSED') {
+        } else if (poolStatus === HEALTH_STATUS_DEGRADED && overallStatus === HEALTH_STATUS_HEALTHY) {
             overallStatus = HEALTH_STATUS_DEGRADED;
-            checks.connectionPool.status = HEALTH_STATUS_DEGRADED;
         }
 
         // Check 4: Environment configuration
