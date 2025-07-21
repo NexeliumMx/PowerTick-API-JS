@@ -10,7 +10,7 @@
  */
 
 const { app } = require('@azure/functions');
-const { getClient } = require('./dbClient');
+const { executeQuery } = require('./dbClient');
 const { Parser } = require('json2csv');
 
 const ALLOWED_ENVIRONMENTS = ['production', 'demo', 'dev'];
@@ -373,9 +373,7 @@ app.http('downloads', {
     context.log('[DEBUG] SQL Params:', params);
 
     try {
-      const client = await getClient();
-      const result = await client.query(query, params);
-      client.release();
+      const result = await executeQuery(query, params);
 
       context.log('[DEBUG] Query result row count:', result.rows.length);
 

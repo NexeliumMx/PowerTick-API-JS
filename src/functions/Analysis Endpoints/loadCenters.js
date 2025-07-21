@@ -14,7 +14,7 @@
  */
 
 const { app } = require('@azure/functions');
-const { getClient } = require('../dbClient');
+const { executeQuery } = require('../dbClient');
 
 const ALLOWED_ENVIROMENTS = ['production', 'demo', 'dev'];
 
@@ -93,9 +93,9 @@ app.http('loadCenters', {
 
         // --- Execute SQL ---
         try {
-            const client = await getClient();
-            const result = await client.query(sql, [user_id]);
-            client.release(); // Release the client back to the pool
+            
+            const result = await executeQuery(sql, [user_id]);
+             // Release the client back to the pool
             return {
                 status: 200,
                 headers: { 'Content-Type': 'application/json' },

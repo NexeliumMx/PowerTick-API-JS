@@ -10,7 +10,7 @@
  */
 
 const { app } = require('@azure/functions');
-const { getClient } = require('./dbClient');
+const { executeQuery } = require('./dbClient');
 
 app.http('supportedTimeZones', {
     methods: ['GET'],
@@ -19,10 +19,7 @@ app.http('supportedTimeZones', {
         context.log(`Http function processed request for url "${request.url}"`);
         const query = 'SELECT * FROM public.supported_timezones';
         try {
-            const client = await getClient();
-            context.log('Executing query:', query);
-            const res = await client.query(query);
-            client.release();
+            const res = await executeQuery(query);
             context.log('Database query executed successfully');
             // Return success message as HTTP response
             return {

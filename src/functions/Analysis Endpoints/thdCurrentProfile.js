@@ -18,7 +18,7 @@
  */
 
 const { app } = require('@azure/functions');
-const { getClient } = require('../dbClient');
+const { executeQuery } = require('../dbClient');
 
 const ALLOWED_ENVIROMENTS = ['production', 'demo', 'dev'];
 const TIME_INTERVALS = ['hour', 'day', 'month'];
@@ -174,11 +174,9 @@ app.http('thdCurrentProfile', {
 
         // --- Execute SQL ---
         try {
-            const client = await getClient();
-            const result = await client.query(sql, [powermeter_id, user_id, start_utc, end_utc]);
-            client.release
+            const result = await executeQuery(sql, [powermeter_id, user_id, start_utc, end_utc]);
+            
             return {
-                
                 status: 200,
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(result.rows),

@@ -10,7 +10,7 @@
  */
 
 const { app } = require('@azure/functions');
-const { getClient } = require('./dbClient');
+const { executeQuery } = require('./dbClient');
 
 const ALLOWED_ENVIROMENTS = ['production', 'demo', 'dev'];
 
@@ -33,7 +33,6 @@ app.http('measurementRange', {
         let schema = env;
         if (env === 'production') schema = 'public';
 
-        const client = await getClient();
         try {
             const sql = `
                 WITH minmax AS (
@@ -52,8 +51,7 @@ app.http('measurementRange', {
                 CROSS JOIN ${schema}.powermeters p
                 WHERE p.powermeter_id = $1;
             `;
-            const result = await client.query(sql, [powermeterId]);
-            client.release();
+            const result = await executeQuery(sql, [powermeterId]);
             if (result.rows.length === 0) {
                 return { status: 404, body: JSON.stringify({ error: 'Not found' }) };
             }

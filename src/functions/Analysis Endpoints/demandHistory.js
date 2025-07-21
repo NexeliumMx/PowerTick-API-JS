@@ -10,7 +10,7 @@
  */
 
 const { app } = require('@azure/functions');
-const { getClient } = require('../dbClient');
+const { executeQuery } = require('../dbClient');
 
 const ALLOWED_ENVIROMENTS = ['production', 'demo', 'dev'];
 
@@ -74,9 +74,9 @@ app.http('demandHistory', {
         const params = [user_id, powermeter_id, start_utc, end_utc];
 
         try {
-            const client = await getClient();
-            const result = await client.query(query, params);
-            client.release(); // Release the client back to the pool
+            
+            const result = await executeQuery(query, params);
+             // Release the client back to the pool
             return {
                 status: 200,
                 headers: { 'Content-Type': 'application/json' },

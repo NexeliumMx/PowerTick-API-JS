@@ -9,7 +9,7 @@
 */
 
 const { app } = require('@azure/functions');
-const { getClient } = require('./dbClient');
+const { executeQuery } = require('./dbClient');
 
 const ALLOWED_ENVIROMENTS = ['public', 'demo', 'dev'];
 
@@ -44,8 +44,6 @@ app.http('fetchPowermetersByUserAccess', {
         }
 
         try {
-            const client = await getClient();
-
             // Dynamically build schema-qualified table name for powermeters only
             const powermetersTable = `${enviroment}.powermeters`;
             const userInstallationsTable = `public.user_installations`;
@@ -72,8 +70,7 @@ app.http('fetchPowermetersByUserAccess', {
             `;
             const values = [userId];
             context.log(`Executing query: ${query} with values: ${values}`);
-            const res = await client.query(query, values);
-            client.release();
+            const res = await executeQuery(query, values);
 
             context.log("Database query executed successfully:", res.rows);
 

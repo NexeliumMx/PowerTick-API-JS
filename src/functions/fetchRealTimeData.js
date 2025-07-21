@@ -9,7 +9,7 @@
 */
 
 const { app } = require('@azure/functions');
-const { getClient } = require('./dbClient');
+const { executeQuery } = require('./dbClient');
 
 const ALLOWED_ENVIROMENTS = ['public', 'demo', 'dev'];
 
@@ -53,8 +53,6 @@ app.http('fetchRealTimeData', {
         }
 
         try {
-            const client = await getClient();
-
             // Dynamically build schema-qualified table names
             const powermetersTable = `${enviroment}.powermeters`;
             const measurementsTable = `${enviroment}.measurements`;
@@ -79,8 +77,7 @@ app.http('fetchRealTimeData', {
             `;
             const values = [userId, powermeterId];
             context.log(`Executing query: ${query} with values: ${values}`);
-            const res = await client.query(query, values);
-            client.release();
+            const res = await executeQuery(query, values);
 
             context.log("Database query executed successfully:", res.rows);
 

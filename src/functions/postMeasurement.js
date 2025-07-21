@@ -8,7 +8,7 @@
  */
 
 const { app } = require('@azure/functions');
-const { getClient } = require('./dbClient');
+const { executeQuery } = require('./dbClient');
 const fs = require('fs');
 const path = require('path');
 
@@ -83,12 +83,9 @@ app.http('postMeasurement', {
         `;
 
         try {
-            const client = await getClient();
-
-            const schemaRes = await client.query(findSchemaQuery, [serialNumber]);
+            const schemaRes = await executeQuery(findSchemaQuery, [serialNumber]);
 
             if (!schemaRes.rows.length) {
-                client.release();
                 return {
                     status: 404,
                     headers: { 'Content-Type': 'application/json' },
@@ -109,8 +106,7 @@ app.http('postMeasurement', {
 
             context.log('Insert query:', `INSERT INTO ${schema}.measurements (${columns.join(',')}) VALUES (${placeholders.join(',')})`);
 
-            await client.query(`INSERT INTO ${schema}.measurements (${columns.join(',')}) VALUES (${placeholders.join(',')})`, values);
-            client.release();
+            await executeQuery(`INSERT INTO ${schema}.measurements (${columns.join(',')}) VALUES (${placeholders.join(',')})`, values);
 
             context.log('Measurement inserted successfully.');
 

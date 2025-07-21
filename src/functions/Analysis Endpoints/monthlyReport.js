@@ -14,7 +14,7 @@
  */
 
 const { app } = require('@azure/functions');
-const { getClient } = require('../dbClient');
+const { executeQuery } = require('../dbClient');
 
 const ALLOWED_ENVIROMENTS = ['production', 'demo', 'dev'];
 
@@ -83,10 +83,8 @@ app.http('monthlyReport', {
             context.log(`Using schema: ${schema}`);
             context.log(`Executing query: ${query}`);
             context.log(`With parameters: ${params}`);
-
-            const client = await getClient();
-            const result = await client.query(query, params);
-            client.release(); // Release the client back to the pool
+            const result = await executeQuery(query, params);
+             // Release the client back to the pool
             return {
                 status: 200,
                 headers: { 'Content-Type': 'application/json' },

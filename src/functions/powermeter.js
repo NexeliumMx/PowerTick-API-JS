@@ -9,7 +9,7 @@
  */
 
 const { app } = require('@azure/functions');
-const { getClient } = require('./dbClient');
+const { executeQuery } = require('./dbClient');
 const fs = require('fs');
 const path = require('path');
 
@@ -53,9 +53,7 @@ app.http('powermeter', {
             const detailsQuery = `SELECT * FROM ${schema}.powermeters WHERE powermeter_id = $1`;
 
             try {
-                const client = await getClient();
-                const detailsRes = await client.query(detailsQuery, [powermeterId]);
-                client.release();
+                const detailsRes = await executeQuery(detailsQuery, [powermeterId]);
                 if (!detailsRes.rows.length) {
                     return {
                         status: 404,
@@ -143,10 +141,8 @@ app.http('powermeter', {
         const query = `INSERT INTO ${schema}.powermeters (${columns.join(',')}) VALUES (${placeholders.join(',')})`;
 
         try {
-            const client = await getClient();
             context.log('Executing query:', query, 'with values:', values);
-            await client.query(query, values);
-            client.release();
+            await executeQuery(query, values);
             context.log('Database insert executed successfully');
             return {
                 status: 200,
