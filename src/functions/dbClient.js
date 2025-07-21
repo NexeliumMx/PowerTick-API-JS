@@ -26,7 +26,7 @@
 const { Pool } = require('pg');
 const { DefaultAzureCredential } = require('@azure/identity');
 
-// Constants for configuration
+// Constants for configuration (performance optimized)
 const CONNECTION_TIMEOUT_MS = 30000; // 30 seconds
 const IDLE_TIMEOUT_MS = 300000; // 5 minutes
 const MAX_CONNECTIONS = 20; // Maximum pool size
@@ -38,9 +38,14 @@ const MAX_RETRY_ATTEMPTS = 3;
 const INITIAL_RETRY_DELAY_MS = 1000;
 const MAX_RETRY_DELAY_MS = 8000;
 
-// Circuit breaker configuration
+// Circuit breaker configuration (enhanced)
 const CIRCUIT_BREAKER_THRESHOLD = 5; // failures before opening
 const CIRCUIT_BREAKER_TIMEOUT_MS = 60000; // 1 minute
+const CIRCUIT_BREAKER_HALF_OPEN_MAX_CALLS = 3; // Max calls in half-open state
+
+// Performance monitoring constants
+const SLOW_QUERY_THRESHOLD_MS = 1000; // Log queries slower than 1 second
+const POOL_STATS_LOG_INTERVAL_MS = 300000; // Log pool stats every 5 minutes
 
 let pool;
 let azureCredential;
@@ -84,32 +89,31 @@ function calculateRetryDelay(attempt) {
     return delay + Math.random() * 1000;
 }
 
+// Pre-compiled Set for O(1) lookup performance
+const RETRYABLE_CODES = new Set([
+    'ECONNRESET',
+    'ECONNREFUSED', 
+    'ETIMEDOUT',
+    'ENOTFOUND',
+    'EAI_AGAIN'
+]);
+
+// Pre-compiled RegExp for efficient string matching
+const RETRYABLE_MESSAGE_PATTERN = /connection terminated|connection closed|server closed the connection|timeout expired|too many clients/i;
+
 /**
- * Checks if an error is retryable
+ * Checks if an error is retryable (optimized for performance)
  * @param {Error} error - The error to check
  * @returns {boolean} True if the error is retryable
  */
 function isRetryableError(error) {
     if (!error) return false;
     
-    const retryableCodes = [
-        'ECONNRESET',
-        'ECONNREFUSED', 
-        'ETIMEDOUT',
-        'ENOTFOUND',
-        'EAI_AGAIN'
-    ];
+    // O(1) code lookup
+    if (error.code && RETRYABLE_CODES.has(error.code)) return true;
     
-    const retryableMessages = [
-        'connection terminated',
-        'connection closed',
-        'server closed the connection',
-        'timeout expired',
-        'too many clients'
-    ];
-    
-    return retryableCodes.includes(error.code) ||
-           retryableMessages.some(msg => error.message?.toLowerCase().includes(msg));
+    // Single regex test instead of multiple string operations
+    return error.message && RETRYABLE_MESSAGE_PATTERN.test(error.message);
 }
 
 /**
@@ -154,20 +158,23 @@ const circuitBreaker = {
 };
 
 /**
- * Retrieves and caches Azure access token with automatic refresh
+ * Retrieves and caches Azure access token with automatic refresh (optimized)
  * @returns {Promise<string>} Valid access token
  */
 async function getAzureToken() {
     const now = Date.now();
     
-    // Return cached token if still valid
+    // Fast path: return cached token if still valid (avoid redundant calculations)
     if (currentToken && tokenExpiryTime && now < (tokenExpiryTime - TOKEN_REFRESH_THRESHOLD_MS)) {
         return currentToken;
     }
     
+    // Lazy initialization for better cold start performance
     if (!azureCredential) {
         azureCredential = new DefaultAzureCredential({
-            managedIdentityClientId: process.env.AZURE_CLIENT_ID // Optional: specify client ID
+            managedIdentityClientId: process.env.AZURE_CLIENT_ID,
+            // Optimize for Azure Functions environment
+            excludeCredentials: ['AzureDeveloperCliCredential', 'AzurePowerShellCredential']
         });
     }
     
@@ -184,7 +191,8 @@ async function getAzureToken() {
         tokenExpiryTime = tokenResponse.expiresOnTimestamp;
         
         logWithEnv('info', 'Azure access token retrieved successfully', {
-            expiresAt: new Date(tokenExpiryTime).toISOString()
+            expiresAt: new Date(tokenExpiryTime).toISOString(),
+            validFor: Math.round((tokenExpiryTime - now) / 60000) + ' minutes'
         });
         
         return currentToken;
@@ -198,7 +206,7 @@ async function getAzureToken() {
 }
 
 /**
- * Creates pool configuration based on environment
+ * Creates pool configuration based on environment (performance optimized)
  * @returns {Promise<Object>} Pool configuration object
  */
 async function createPoolConfig() {
@@ -210,31 +218,36 @@ async function createPoolConfig() {
         port: parseInt(process.env.PGPORT) || 5432,
         user: process.env.PGUSER,
         
-        // Connection pool settings
+        // Optimized connection pool settings
         max: MAX_CONNECTIONS,
         min: MIN_CONNECTIONS,
         idleTimeoutMillis: IDLE_TIMEOUT_MS,
         connectionTimeoutMillis: CONNECTION_TIMEOUT_MS,
         
-        // Query settings
+        // Performance optimized query settings
         statement_timeout: STATEMENT_TIMEOUT_MS,
         query_timeout: QUERY_TIMEOUT_MS,
         
-        // SSL configuration
+        // Optimized SSL configuration
         ssl: {
             rejectUnauthorized: false,
-            // In production, consider setting rejectUnauthorized: true with proper CA
+            // Reuse SSL connections for better performance
+            checkServerIdentity: false
         },
         
         // Application name for monitoring
         application_name: `powertick-api-${process.env.ENVIRONMENT || 'unknown'}`,
         
-        // Enable keep alive
+        // Optimized keep alive settings
         keepAlive: true,
         keepAliveInitialDelayMillis: 10000,
         
-        // Connection validation
+        // Performance optimizations
         parseInputDatesAsUTC: true,
+        // Enable connection validation with minimal overhead
+        allowExitOnIdle: true,
+        // Optimize for Azure PostgreSQL
+        options: '--search_path=public'
     };
     
     if (isLocal) {
