@@ -4,8 +4,22 @@ app.setup({
     enableHttpStream: true,
 });
 
-// Health check endpoint
+// Health and monitoring endpoints
 require('./functions/healthCheck');
+require('./functions/testDBconnection');
+
+// Core API endpoints
+require('./functions/fetchPowermetersByUserAccess');
+require('./functions/fetchRealTimeData');
+require('./functions/postMeasurement');
+require('./functions/powermeter');
+require('./functions/measurementRange');
+require('./functions/downloads');
+
+// Support endpoints
+require('./functions/supportedModels');
+require('./functions/supportedTimeZones');
+require('./functions/httpTrigger1');
 
 // Import all Analysis Endpoints
 require('./functions/Analysis Endpoints/consumptionHistory');
