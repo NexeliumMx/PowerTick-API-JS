@@ -7,6 +7,7 @@ app.setup({
 // Health and monitoring endpoints
 require('./functions/healthCheck');
 require('./functions/testDBconnection');
+require('./functions/resetCircuitBreaker');
 
 // Core API endpoints
 require('./functions/fetchPowermetersByUserAccess');

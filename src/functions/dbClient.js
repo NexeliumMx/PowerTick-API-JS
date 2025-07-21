@@ -172,9 +172,8 @@ async function getAzureToken() {
     // Lazy initialization for better cold start performance
     if (!azureCredential) {
         azureCredential = new DefaultAzureCredential({
-            managedIdentityClientId: process.env.AZURE_CLIENT_ID,
-            // Optimize for Azure Functions environment
-            excludeCredentials: ['AzureDeveloperCliCredential', 'AzurePowerShellCredential']
+            managedIdentityClientId: process.env.AZURE_CLIENT_ID
+            // Removed excludeCredentials to ensure compatibility
         });
     }
     
@@ -228,26 +227,20 @@ async function createPoolConfig() {
         statement_timeout: STATEMENT_TIMEOUT_MS,
         query_timeout: QUERY_TIMEOUT_MS,
         
-        // Optimized SSL configuration
+        // SSL configuration
         ssl: {
-            rejectUnauthorized: false,
-            // Reuse SSL connections for better performance
-            checkServerIdentity: false
+            rejectUnauthorized: false
         },
         
         // Application name for monitoring
         application_name: `powertick-api-${process.env.ENVIRONMENT || 'unknown'}`,
         
-        // Optimized keep alive settings
+        // Keep alive settings
         keepAlive: true,
         keepAliveInitialDelayMillis: 10000,
         
-        // Performance optimizations
-        parseInputDatesAsUTC: true,
-        // Enable connection validation with minimal overhead
-        allowExitOnIdle: true,
-        // Optimize for Azure PostgreSQL
-        options: '--search_path=public'
+        // Connection validation
+        parseInputDatesAsUTC: true
     };
     
     if (isLocal) {
@@ -537,7 +530,9 @@ function getPoolMetrics() {
             status: 'not_initialized',
             totalCount: 0,
             idleCount: 0,
-            waitingCount: 0
+            waitingCount: 0,
+            circuitBreakerState,
+            circuitBreakerFailureCount
         };
     }
     
@@ -549,6 +544,21 @@ function getPoolMetrics() {
         circuitBreakerState,
         circuitBreakerFailureCount
     };
+}
+
+/**
+ * Manually resets the circuit breaker (for emergency recovery)
+ * @returns {void}
+ */
+function resetCircuitBreaker() {
+    circuitBreakerState = 'CLOSED';
+    circuitBreakerFailureCount = 0;
+    circuitBreakerLastFailureTime = 0;
+    
+    logWithEnv('warn', 'Circuit breaker manually reset', {
+        timestamp: new Date().toISOString(),
+        action: 'manual_reset'
+    });
 }
 
 // Graceful shutdown handler
@@ -568,5 +578,6 @@ module.exports = {
     getClient, 
     executeQuery, 
     getPoolMetrics, 
-    destroyPool 
+    destroyPool,
+    resetCircuitBreaker
 };
