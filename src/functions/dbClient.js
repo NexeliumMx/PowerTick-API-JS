@@ -285,15 +285,8 @@ async function validatePoolHealth() {
  */
 async function initPool() {
     if (pool) {
-        // Validate existing pool health
-        const isHealthy = await validatePoolHealth();
-        if (isHealthy) {
-            logWithEnv('info', 'Reusing existing healthy connection pool');
-            return pool;
-        } else {
-            logWithEnv('warn', 'Existing pool unhealthy, recreating...');
-            await destroyPool();
-        }
+        logWithEnv('info', 'Reusing existing connection pool');
+        return pool;
     }
     
     let lastError;
@@ -403,12 +396,14 @@ async function getClient() {
         logWithEnv('warn', 'Request blocked by circuit breaker');
         throw error;
     }
-    
+
     try {
-        // Ensure pool is initialized
-        const activePool = await initPool();
+        // Initialize pool only if it doesn't exist (avoid redundant initialization)
+        if (!pool) {
+            pool = await initPool();
+        }
         
-        logWithEnv('info', 'Acquiring client from pool', {
+        const activePool = pool;        logWithEnv('info', 'Acquiring client from pool', {
             totalCount: activePool.totalCount,
             idleCount: activePool.idleCount,
             waitingCount: activePool.waitingCount
