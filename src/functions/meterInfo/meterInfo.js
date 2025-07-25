@@ -83,6 +83,7 @@ app.http('meterInfo', {
     GROUP BY 
     p.powermeter_alias,
     i.installation_alias,
+    i.installation_id,
     i.register_date,
     i.region,
     i.tariff,
