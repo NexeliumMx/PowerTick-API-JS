@@ -40,3 +40,4 @@ require('./functions/Analysis Endpoints/loadCenters');
 // Meter Info endpoint
 require('./functions/meterInfo/meterInfo');
 require('./functions/meterInfo/updatePowermeterAlias');
+require('./functions/meterInfo/updateInstallationAlias');
