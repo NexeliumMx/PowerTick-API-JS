@@ -15,26 +15,9 @@ app.http('updateInstallationAlias', {
   authLevel: 'anonymous',
   handler: async (request, context) => {
     const userId = request.query.get('user_id');
-    const installationIdRaw = request.query.get('installation_id');
+    const installationId = request.query.get('installation_id');
     const newAlias = request.query.get('new_alias');
     const environment = request.query.get('enviroment') || 'production';
-
-    const INVALID_ID = Number.NaN;
-    const installationId = Number(installationIdRaw);
-
-    if (
-      !userId ||
-      !installationIdRaw ||
-      Number.isNaN(installationId) ||
-      !newAlias ||
-      !newAlias.trim()
-    ) {
-      return {
-        status: 400,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ success: false, error: 'Missing or invalid parameters' }),
-      };
-    }
 
     const schema = getSchema(environment);
     if (!schema) {
