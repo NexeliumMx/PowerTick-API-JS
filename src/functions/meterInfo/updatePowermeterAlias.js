@@ -15,11 +15,21 @@ app.http('updatePowermeterAlias', {
   authLevel: 'anonymous',
   handler: async (request, context) => {
     const userId = request.query.get('user_id');
-    const powermeterId = request.query.get('powermeter_id');
+    const powermeterIdRaw = request.query.get('powermeter_id');
     const newAlias = request.query.get('new_alias');
-    const environment = request.query.get('environment') || 'production';
+    const environment = request.query.get('enviroment') || 'production';
 
-    if (!userId || !powermeterId || !newAlias || !newAlias.trim()) {
+    // Avoid magic numbers by using a named constant for invalid ID
+    const INVALID_ID = Number.NaN;
+    const powermeterId = Number(powermeterIdRaw);
+
+    if (
+      !userId ||
+      !powermeterIdRaw ||
+      Number.isNaN(powermeterId) ||
+      !newAlias ||
+      !newAlias.trim()
+    ) {
       return {
         status: 400,
         headers: { 'Content-Type': 'application/json' },
