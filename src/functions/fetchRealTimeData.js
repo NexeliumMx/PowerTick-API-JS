@@ -101,7 +101,7 @@ async function fetchRealTimeDataHandler(request, context) {
             throw new Error(`Database query failed: ${result.error}`);
         }
 
-        
+        context.log(`Fetched data for powermeter ${powermeter_id}: ${JSON.stringify(result.rows)}`);
 
         return {
             status: 200,
@@ -114,7 +114,7 @@ async function fetchRealTimeDataHandler(request, context) {
         };
 
     } catch (error) {
-        
+        context.log.error(`Error in fetchRealTimeDataHandler: ${error.message}`, error);
         throw error; // Let the error handler wrapper handle this
     }
 }
