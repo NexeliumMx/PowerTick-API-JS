@@ -18,19 +18,7 @@ const ALLOWED_ENVIROMENTS = ['public', 'demo', 'dev'];
  * Fetch real-time data with enhanced error handling and validation
  */
 async function fetchRealTimeDataHandler(request, context) {
-    logWithEnv('info', 'Fetch real-time data request started', {
-        url: request.url,
-        uptime: process.uptime()
-    }, context);
-
-    // Trigger background pool pre-warming on cold starts
-    if (process.uptime() < 30) {
-        preWarmPool().catch(error => {
-            logWithEnv('warn', 'Background pre-warm failed', {
-                error: error.message
-            }, context);
-        });
-    }
+    context.log(`Http function processed request for url "${request.url}"`);
 
     // Extract and validate parameters
     const params = {
@@ -38,14 +26,14 @@ async function fetchRealTimeDataHandler(request, context) {
         powermeter_id: request.query.get('powermeter_id'),
         enviroment: request.query.get('enviroment') || 'public'
     };
-
+    context.log(`Received parameters: ${JSON.stringify(params)}`);
     // Input validation
     const validation = validateInput(params, {
         user_id: { required: true, type: 'string' },
         powermeter_id: { required: true, type: 'string' },
         enviroment: { required: false, allowedValues: ALLOWED_ENVIROMENTS }
     });
-
+    context.log(`Validation result: ${JSON.stringify(validation)}`);
     if (!validation.isValid) {
         return {
             status: 400,
