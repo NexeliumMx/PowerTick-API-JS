@@ -96,16 +96,12 @@ async function fetchRealTimeDataHandler(request, context) {
         `;
         
         const result = await executeQuery(dataQuery, [powermeter_id]);
-        
+        context.log(`Data query executed: ${dataQuery} with result: ${JSON.stringify(result)}`);
         if (!result.success) {
             throw new Error(`Database query failed: ${result.error}`);
         }
 
-        logWithEnv('info', 'Real-time data retrieved successfully', {
-            user_id,
-            powermeter_id,
-            recordCount: result.rowCount
-        }, context);
+        
 
         return {
             status: 200,
@@ -118,12 +114,7 @@ async function fetchRealTimeDataHandler(request, context) {
         };
 
     } catch (error) {
-        logWithEnv('error', 'Failed to fetch real-time data', {
-            user_id,
-            powermeter_id,
-            enviroment,
-            error: error.message
-        }, context);
+        
         throw error; // Let the error handler wrapper handle this
     }
 }
