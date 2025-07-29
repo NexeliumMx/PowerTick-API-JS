@@ -82,12 +82,12 @@ async function fetchRealTimeDataHandler(request, context) {
         const dataQuery = `
             SELECT 
                 timestamp,
-                voltage_l1_n, voltage_l2_n, voltage_l3_n,
+                voltage_l1, voltage_l2, voltage_l3,
                 current_l1, current_l2, current_l3,
-                watts_l1, watts_l2, watts_l3, watts_total,
-                vars_l1, vars_l2, vars_l3, vars_total,
-                pf_l1, pf_l2, pf_l3, pf_total,
-                kwh_total, kvarh_total,
+                watts_l1, watts_l2, watts_l3, watts,
+                var_l1, var_l2, var_l3, var,
+                pf_l1, pf_l2, pf_l3, power_factor,
+                kwh_imported_total, varh_imported_total,
                 frequency
             FROM ${enviroment}.measurements 
             WHERE powermeter_id = $1 
