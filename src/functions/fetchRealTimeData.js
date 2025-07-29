@@ -64,7 +64,7 @@ async function fetchRealTimeDataHandler(request, context) {
         context.log(`Executing access query: ${accessQuery} with params: [${user_id}, ${powermeter_id}]`);
         const accessResult = await executeQuery(accessQuery, [user_id, powermeter_id]);
         context.log(`Access query result: ${JSON.stringify(accessResult)}`);
-        if (accessResult.data.length == 0) {
+        if (accessResult.rowCount == 0) {
             return {
                 status: 403,
                 headers: { 'Content-Type': 'application/json' },
@@ -104,7 +104,7 @@ async function fetchRealTimeDataHandler(request, context) {
         logWithEnv('info', 'Real-time data retrieved successfully', {
             user_id,
             powermeter_id,
-            recordCount: result.data.length
+            recordCount: result.rowCount
         }, context);
 
         return {
@@ -112,7 +112,7 @@ async function fetchRealTimeDataHandler(request, context) {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 success: true,
-                data: result.data,
+                data: result.rows,
                 timestamp: new Date().toISOString()
             })
         };
