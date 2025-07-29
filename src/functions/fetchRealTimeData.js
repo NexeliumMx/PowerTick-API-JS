@@ -80,7 +80,7 @@ async function fetchRealTimeDataHandler(request, context) {
         
         const accessResult = await executeQuery(accessQuery, [user_id, powermeter_id]);
         
-        if (!accessResult.success || accessResult.data.length === 0) {
+        if (accessResult.data.length === 0) {
             return {
                 status: 403,
                 headers: { 'Content-Type': 'application/json' },
