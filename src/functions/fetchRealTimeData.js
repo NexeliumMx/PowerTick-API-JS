@@ -48,14 +48,10 @@ async function fetchRealTimeDataHandler(request, context) {
             })
         };
     }
-
+    context.log(`Validated parameters: ${JSON.stringify(params)}`);
     const { user_id, powermeter_id, enviroment } = params;
     
-    logWithEnv('info', 'Processing real-time data request', {
-        user_id,
-        powermeter_id,
-        enviroment
-    }, context);
+    context.log(`Using environment: ${enviroment}`);
 
     try {
         // First, verify user has access to this powermeter
@@ -65,9 +61,9 @@ async function fetchRealTimeDataHandler(request, context) {
             JOIN public.user_installations upa ON pm.installation_id = upa.installation_id
             WHERE upa.user_id = $1 AND pm.powermeter_id = $2
         `;
-        
+        context.log(`Executing access query: ${accessQuery} with params: [${user_id}, ${powermeter_id}]`);
         const accessResult = await executeQuery(accessQuery, [user_id, powermeter_id]);
-        
+        context.log(`Access query result: ${JSON.stringify(accessResult)}`);
         if (accessResult.data.length == 0) {
             return {
                 status: 403,
@@ -81,7 +77,7 @@ async function fetchRealTimeDataHandler(request, context) {
                 })
             };
         }
-
+        context.log(`User ${user_id} has access to powermeter ${powermeter_id}`);
         // Fetch the latest measurement
         const dataQuery = `
             SELECT 
