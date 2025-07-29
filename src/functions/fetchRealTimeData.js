@@ -74,7 +74,7 @@ async function fetchRealTimeDataHandler(request, context) {
         const accessQuery = `
             SELECT pm.powermeter_id 
             FROM ${enviroment}.powermeters pm
-            JOIN ${enviroment}.user_powermeter_access upa ON pm.powermeter_id = upa.powermeter_id
+            JOIN ${enviroment}.user_installations upa ON pm.powermeter_id = upa.powermeter_id
             WHERE upa.user_id = $1 AND pm.powermeter_id = $2
         `;
         
