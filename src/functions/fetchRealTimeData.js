@@ -97,7 +97,7 @@ async function fetchRealTimeDataHandler(request, context) {
         
         const result = await executeQuery(dataQuery, [powermeter_id]);
         context.log(`Data query executed: ${dataQuery} with result: ${JSON.stringify(result)}`);
-        if (!result.success) {
+        if (!(result.rowCount===1)) {
             throw new Error(`Database query failed: ${result.error}`);
         }
 
