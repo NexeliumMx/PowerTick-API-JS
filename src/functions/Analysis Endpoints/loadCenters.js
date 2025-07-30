@@ -55,7 +55,7 @@ app.http('loadCenters', {
             consumption AS (
                 SELECT
                     m.powermeter_id,
-                    last(m.kwh_imported_total, m."timestamp") - first(m.kwh_imported_total, m."timestamp") AS consumption
+                    last(m.kwh_imported_total, m."timestamp")  - COALESCE(first(m.kwh_imported_total, m."timestamp"),0) AS consumption
                 FROM ${schema}.measurements m
                 JOIN authorized_powermeter ap ON m.powermeter_id = ap.powermeter_id
                 CROSS JOIN month_range

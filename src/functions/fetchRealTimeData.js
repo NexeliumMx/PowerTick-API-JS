@@ -108,7 +108,7 @@ async function fetchRealTimeDataHandler(request, context) {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 success: true,
-                data: result.rows,
+                data: result.rows[0],
                 timestamp: new Date().toISOString()
             })
         };
