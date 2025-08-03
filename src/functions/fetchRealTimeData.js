@@ -82,7 +82,8 @@ async function fetchRealTimeDataHandler(request, context) {
         const dataQuery = `
             SELECT 
                 timestamp,
-                voltage_l1, voltage_l2, voltage_l3,
+                voltage_l1, voltage_l2, voltage_l3,voltage_ln,
+                voltage_l1_l2,voltage_l2_l3,voltage_l3_l1,voltage_ll,
                 current_l1, current_l2, current_l3,
                 watts_l1, watts_l2, watts_l3, watts,
                 var_l1, var_l2, var_l3, var,
