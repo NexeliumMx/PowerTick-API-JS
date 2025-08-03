@@ -94,6 +94,27 @@ async function fetchRealTimeDataHandler(request, context) {
                 pf_l1, pf_l2, pf_l3, power_factor,
                 kwh_imported_total, varh_imported_total,
                 frequency
+                kwh_imported_total,
+                kwh_imported_l1 ,
+                kwh_imported_l2,
+                kwh_imported_l3,
+                varh_imported_q1,
+                varh_imported_q1_l1,
+                varh_imported_q1_l2,
+                varh_imported_q1_l3,
+                varh_imported_q2,
+                varh_imported_q2_l1,
+                varh_imported_q2_l2,
+                varh_imported_q2_l3, 
+                kwh_exported_total,
+                kwh_exported_l1,
+                kwh_exported_l2,
+                kwh_exported_l3,
+                varh_exported_q4,
+                varh_exported_q4_l1,
+                varh_exported_q4_l2,
+                varh_exported_q4_l3
+
             FROM ${enviroment}.measurements 
             WHERE powermeter_id = $1 
             ORDER BY timestamp DESC 
