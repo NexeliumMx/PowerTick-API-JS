@@ -197,10 +197,10 @@ const COLUMN_ALIASES = {
     varh_exported_total: 'Exportación Total de Energía Reactiva (VArh)',
   },
 };
-function getColumnSelect(language) {
+function getColumnSelect(language,tz='UTC') {
   const aliases = COLUMN_ALIASES[language] || COLUMN_ALIASES[DEFAULT_LANGUAGE];
   return [
-    `m.timestamp::date AS "${aliases.date}"`,
+    `m.timestamp AT TIME ZONE '${tz}'::date AS "${aliases.date}"`,
     `TO_CHAR(m.timestamp, '${CSV_TIME_FORMAT}') AS "${aliases.time}"`,
     `m.current_total AS "${aliases.current_total}"`,
     `m.current_l1 AS "${aliases.current_l1}"`,
@@ -349,7 +349,7 @@ app.http('downloads', {
     const measurementsTable = `${schema}.measurements`;
     const userInstallationsTable = `${DEFAULT_SCHEMA}.user_installations`;
 
-    const columnSelect = getColumnSelect(language);
+    const columnSelect = getColumnSelect(language,tz);
 
     const query = `
       WITH authorized_powermeter AS (
