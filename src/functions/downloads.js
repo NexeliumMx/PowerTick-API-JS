@@ -310,6 +310,7 @@ app.http('downloads', {
     const powermeterId = Number(request.query.get('powermeter_id'));
     const month = request.query.get('month');
     const year = request.query.get('year');
+    const tz = request.query.get('tz') || 'UTC';
     const environment = request.query.get('environment');
     const language = (request.query.get('language') || DEFAULT_LANGUAGE).toLowerCase();
 
@@ -362,8 +363,8 @@ app.http('downloads', {
         ${columnSelect}
       FROM ${measurementsTable} m
       JOIN authorized_powermeter ap ON m.powermeter_id = ap.powermeter_id
-      WHERE m.timestamp >= $3
-        AND m.timestamp < $4
+      WHERE m.timestamp AT TIME ZONE '${tz}' >= $3
+        AND m.timestamp AT TIME ZONE '${tz}' < $4
       ORDER BY m.timestamp ASC;
     `;
 
