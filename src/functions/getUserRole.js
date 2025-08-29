@@ -1,4 +1,5 @@
 const { app } = require('@azure/functions');
+const { executeQuery } = require('./pgPool');
 
 app.http('getUserRole', {
     methods: ['GET'],
